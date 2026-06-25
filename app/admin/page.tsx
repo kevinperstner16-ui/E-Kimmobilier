@@ -335,16 +335,30 @@ export default function AdminPage() {
                     className="col-span-2 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary"
                     rows={3}
                   />
-                  <input
-                    type="url"
-                    name="imageUrl"
-                    placeholder="URL de l’image principale"
-                    value={formData.images?.[0] || ''}
-                    onChange={(event) =>
-                      setFormData({ ...formData, images: event.target.value ? [event.target.value] : [] })
-                    }
-                    className="col-span-2 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary"
-                  />
+                  <div className="col-span-2">
+                    <label className="mb-1 block text-sm font-semibold text-gray-700">
+                      URLs des images
+                    </label>
+                    <textarea
+                      name="imageUrls"
+                      placeholder={`Colle une ou plusieurs URLs, séparées par un espace ou une ligne.\nExemple :\nhttps://site.com/image1.jpg\nhttps://site.com/image2.jpg`}
+                      value={formData.images?.join('\n') || ''}
+                      onChange={(event) =>
+                        setFormData({
+                          ...formData,
+                          images: event.target.value
+                            .split(/\s+/)
+                            .map((url) => url.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      className="min-h-28 w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-secondary"
+                      rows={4}
+                    />
+                    <p className="mt-1 text-sm text-gray-500">
+                      La première URL sera l’image principale, les autres seront visibles dans la galerie.
+                    </p>
+                  </div>
                   <label className="flex items-center gap-2 col-span-2">
                     <input
                       type="checkbox"
