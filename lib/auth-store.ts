@@ -7,7 +7,7 @@ export type UserRole = 'admin' | 'user';
 
 export type AuthLog = {
   id: string;
-  type: 'login' | 'register' | 'logout' | 'password_reset' | 'role_update';
+  type: 'login' | 'register' | 'logout' | 'password_reset' | 'password_reset_request' | 'role_update';
   email: string;
   message: string;
   createdAt: string;
@@ -29,12 +29,12 @@ interface AuthStore {
   currentUser: PublicUser | null;
   login: (email: string, password: string) => { success: boolean; message: string };
   register: (name: string, email: string, password: string) => { success: boolean; message: string };
-  resetPassword: (userId: string) => {
+  requestPasswordReset: (userId: string) => {
     success: boolean;
     message: string;
-    password?: string;
     user?: AuthUser;
   };
+  updatePassword: (email: string, password: string) => { success: boolean; message: string };
   setUserRole: (userId: string, role: UserRole) => { success: boolean; message: string };
   clearLogs: () => void;
   logout: () => void;
@@ -68,9 +68,6 @@ const createLog = (type: AuthLog['type'], email: string, message: string): AuthL
   message,
   createdAt: new Date().toISOString(),
 });
-
-const createTemporaryPassword = () =>
-  `EK-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString().slice(-4)}!`;
 
 const pushLog = (logs: AuthLog[], log: AuthLog) => [log, ...(logs ?? [])].slice(0, 200);
 
@@ -124,30 +121,49 @@ export const useAuthStore = create<AuthStore>()(
         }));
         return { success: true, message: 'Compte créé avec succès.' };
       },
-      resetPassword: (userId) => {
+      requestPasswordReset: (userId) => {
         const user = get().users.find((candidate) => candidate.id === userId);
 
         if (!user) {
           return { success: false, message: 'Compte introuvable.' };
         }
 
-        const password = createTemporaryPassword();
-        const updatedUser = { ...user, password };
-
         set((state) => ({
-          users: state.users.map((candidate) => (candidate.id === userId ? updatedUser : candidate)),
           logs: pushLog(
             state.logs,
-            createLog('password_reset', user.email, `Mot de passe réinitialisé pour ${user.name}.`)
+            createLog('password_reset_request', user.email, `Lien de reset préparé pour ${user.name}.`)
           ),
         }));
 
         return {
           success: true,
-          message: 'Mot de passe réinitialisé.',
-          password,
-          user: updatedUser,
+          message: 'Lien de reset préparé.',
+          user,
         };
+      },
+      updatePassword: (email, password) => {
+        const normalizedEmail = normalizeEmail(email);
+        const user = get().users.find((candidate) => normalizeEmail(candidate.email) === normalizedEmail);
+
+        if (!user) {
+          return { success: false, message: 'Compte introuvable.' };
+        }
+
+        set((state) => ({
+          users: state.users.map((candidate) =>
+            normalizeEmail(candidate.email) === normalizedEmail ? { ...candidate, password } : candidate
+          ),
+          currentUser:
+            state.currentUser && normalizeEmail(state.currentUser.email) === normalizedEmail
+              ? withoutPassword({ ...user, password })
+              : state.currentUser,
+          logs: pushLog(
+            state.logs,
+            createLog('password_reset', user.email, `Mot de passe modifié par ${user.name}.`)
+          ),
+        }));
+
+        return { success: true, message: 'Mot de passe modifié avec succès.' };
       },
       setUserRole: (userId, role) => {
         const user = get().users.find((candidate) => candidate.id === userId);
@@ -164,6 +180,8 @@ export const useAuthStore = create<AuthStore>()(
           users: state.users.map((candidate) =>
             candidate.id === userId ? { ...candidate, role } : candidate
           ),
+          currentUser:
+            state.currentUser?.id === userId ? { ...state.currentUser, role } : state.currentUser,
           logs: pushLog(
             state.logs,
             createLog('role_update', user.email, `${user.name} est maintenant ${role}.`)

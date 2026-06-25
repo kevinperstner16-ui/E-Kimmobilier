@@ -35,7 +35,7 @@ export default function AdminPage() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const users = useAuthStore((state) => state.users);
   const logs = useAuthStore((state) => state.logs);
-  const resetPassword = useAuthStore((state) => state.resetPassword);
+  const requestPasswordReset = useAuthStore((state) => state.requestPasswordReset);
   const setUserRole = useAuthStore((state) => state.setUserRole);
   const clearLogs = useAuthStore((state) => state.clearLogs);
   const isPrimaryAdmin = currentUser?.email === ADMIN_EMAIL;
@@ -54,7 +54,7 @@ export default function AdminPage() {
   const [expandedProperty, setExpandedProperty] = useState<string | null>(null);
   const [showAddPropertyForm, setShowAddPropertyForm] = useState(false);
   const [editingProperty, setEditingProperty] = useState<string | null>(null);
-  const [resetResult, setResetResult] = useState<{ email: string; password: string } | null>(null);
+  const [resetResult, setResetResult] = useState<{ email: string; link: string } | null>(null);
 
   const [formData, setFormData] = useState<Partial<Property>>({
     name: '',
@@ -207,7 +207,7 @@ export default function AdminPage() {
       `Bonjour ${booking.name},`,
       '',
       `Merci pour votre demande concernant ${property?.name || 'notre annonce'}.`,
-      `Date souhaitée : ${formatFrenchDate(booking.checkInDate)}`,
+      `Date souhaitÃ©e : ${formatFrenchDate(booking.checkInDate)}`,
       '',
       'Nous revenons vers vous concernant votre demande.',
       '',
@@ -224,16 +224,24 @@ export default function AdminPage() {
       timeStyle: 'medium',
     }).format(new Date(date));
 
-  const getResetMailLink = (email: string, password: string) => {
+  const getResetPageLink = (email: string) => {
+    const resetUrl = new URL('../reset-password/', window.location.href);
+    resetUrl.searchParams.set('email', email);
+
+    return resetUrl.toString();
+  };
+
+  const getResetMailLink = (email: string, resetLink: string) => {
     const subject = 'Réinitialisation de votre mot de passe E&K Immobilier';
     const body = [
       'Bonjour,',
       '',
-      'Votre mot de passe E&K Immobilier a été réinitialisé.',
+      'Une demande de reset de mot de passe a été préparée pour votre compte E&K Immobilier.',
       '',
-      `Nouveau mot de passe temporaire : ${password}`,
+      'Cliquez sur ce lien pour choisir votre nouveau mot de passe :',
+      resetLink,
       '',
-      'Vous pouvez maintenant vous reconnecter avec ce mot de passe.',
+      'Si vous n’êtes pas à l’origine de cette demande, ignorez ce message.',
       '',
       'Cordialement,',
       'E&K Immobilier',
@@ -241,15 +249,15 @@ export default function AdminPage() {
 
     return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
-
   const handleResetPassword = (userId: string) => {
     if (!isPrimaryAdmin) return;
 
-    const result = resetPassword(userId);
+    const result = requestPasswordReset(userId);
 
-    if (result.success && result.user && result.password) {
-      setResetResult({ email: result.user.email, password: result.password });
-      window.location.href = getResetMailLink(result.user.email, result.password);
+    if (result.success && result.user) {
+      const resetLink = getResetPageLink(result.user.email);
+      setResetResult({ email: result.user.email, link: resetLink });
+      window.location.href = getResetMailLink(result.user.email, resetLink);
     }
   };
 
@@ -262,7 +270,7 @@ export default function AdminPage() {
   if (!authChecked || currentUser?.role !== 'admin') {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
-        <p className="font-semibold text-primary">Vérification de l’accès administrateur…</p>
+        <p className="font-semibold text-primary">VÃ©rification de lâ€™accÃ¨s administrateurâ€¦</p>
       </main>
     );
   }
@@ -273,7 +281,7 @@ export default function AdminPage() {
       <main className="max-w-7xl mx-auto px-4 py-12">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-primary mb-2">Tableau de Bord Admin</h1>
-          <p className="text-gray-600">Gérez vos propriétés et vos réservations</p>
+          <p className="text-gray-600">GÃ©rez vos propriÃ©tÃ©s et vos rÃ©servations</p>
         </div>
 
         {/* Stats */}
@@ -288,7 +296,7 @@ export default function AdminPage() {
                 <Home size={24} className="text-secondary" />
               </div>
               <div>
-                <p className="text-gray-600 text-sm">Propriétés</p>
+                <p className="text-gray-600 text-sm">PropriÃ©tÃ©s</p>
                 <p className="text-3xl font-bold text-primary">{properties.length}</p>
               </div>
             </div>
@@ -305,7 +313,7 @@ export default function AdminPage() {
                 <Calendar size={24} className="text-accent" />
               </div>
               <div>
-                <p className="text-gray-600 text-sm">Réservations</p>
+                <p className="text-gray-600 text-sm">RÃ©servations</p>
                 <p className="text-3xl font-bold text-primary">{bookings.length}</p>
               </div>
             </div>
@@ -360,7 +368,7 @@ export default function AdminPage() {
                 : 'text-gray-600 hover:text-primary'
             }`}
           >
-            Propriétés
+            PropriÃ©tÃ©s
           </button>
           <button
             onClick={() => setActiveTab('bookings')}
@@ -370,7 +378,7 @@ export default function AdminPage() {
                 : 'text-gray-600 hover:text-primary'
             }`}
           >
-            Réservations
+            RÃ©servations
           </button>
           {isPrimaryAdmin && (
             <>
@@ -414,7 +422,7 @@ export default function AdminPage() {
                 className="bg-secondary hover:bg-opacity-90 text-white font-bold py-2 px-4 rounded-lg transition-all flex items-center gap-2"
               >
                 <Plus size={20} />
-                Ajouter une propriété
+                Ajouter une propriÃ©tÃ©
               </button>
             </div>
 
@@ -426,13 +434,13 @@ export default function AdminPage() {
                 className="bg-white p-8 rounded-lg shadow-md mb-8"
               >
                 <h3 className="text-2xl font-bold text-primary mb-6">
-                  {editingProperty ? 'Modifier la propriété' : 'Nouvelle propriété'}
+                  {editingProperty ? 'Modifier la propriÃ©tÃ©' : 'Nouvelle propriÃ©tÃ©'}
                 </h3>
                 <form onSubmit={handlePropertySubmit} className="grid grid-cols-2 gap-4">
                   <input
                     type="text"
                     name="name"
-                    placeholder="Nom de la propriété"
+                    placeholder="Nom de la propriÃ©tÃ©"
                     value={formData.name || ''}
                     onChange={handleFormChange}
                     required
@@ -449,7 +457,7 @@ export default function AdminPage() {
                   <input
                     type="number"
                     name="price"
-                    placeholder="Prix (€/mois)"
+                    placeholder="Prix (â‚¬/mois)"
                     value={formData.price || ''}
                     onChange={handleFormChange}
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary"
@@ -473,7 +481,7 @@ export default function AdminPage() {
                   <input
                     type="number"
                     name="area"
-                    placeholder="Surface (m²)"
+                    placeholder="Surface (mÂ²)"
                     value={formData.area || ''}
                     onChange={handleFormChange}
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary"
@@ -488,12 +496,12 @@ export default function AdminPage() {
                   />
                   <div className="col-span-2">
                     <label className="mb-1 block text-sm font-semibold text-gray-700">
-                      Images de l’annonce
+                      Images de lâ€™annonce
                     </label>
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                       <label className="mb-3 block">
                         <span className="mb-1 block text-sm font-semibold text-gray-700">
-                          Ajouter des photos depuis ton téléphone / PC
+                          Ajouter des photos depuis ton tÃ©lÃ©phone / PC
                         </span>
                         <input
                           type="file"
@@ -506,11 +514,11 @@ export default function AdminPage() {
 
                       <label className="block">
                         <span className="mb-1 block text-sm font-semibold text-gray-700">
-                          Ou ajouter des URLs d’images
+                          Ou ajouter des URLs dâ€™images
                         </span>
                         <textarea
                           name="imageUrls"
-                          placeholder={`Tu peux écrire/coller une URL par ligne, ou les séparer par un espace.\nhttps://site.com/image1.jpg\nhttps://site.com/image2.jpg`}
+                          placeholder={`Tu peux Ã©crire/coller une URL par ligne, ou les sÃ©parer par un espace.\nhttps://site.com/image1.jpg\nhttps://site.com/image2.jpg`}
                           value={(formData.images || []).filter((image) => !image.startsWith('data:')).join('\n')}
                           onChange={(event) => {
                             const uploadedImages = (formData.images || []).filter((image) =>
@@ -532,7 +540,7 @@ export default function AdminPage() {
                       </label>
 
                       <p className="mt-2 text-sm text-gray-500">
-                        La première image sera l’image principale. Les liens Pinterest/Pixabay peuvent parfois être bloqués par le site source : dans ce cas, l’upload fichier est plus fiable.
+                        La premiÃ¨re image sera lâ€™image principale. Les liens Pinterest/Pixabay peuvent parfois Ãªtre bloquÃ©s par le site source : dans ce cas, lâ€™upload fichier est plus fiable.
                       </p>
 
                       {(formData.images || []).length > 0 && (
@@ -584,11 +592,11 @@ export default function AdminPage() {
                   </label>
                   {!formData.available && (
                     <div className="col-span-2 rounded-lg border border-orange-200 bg-orange-50 p-4">
-                      <h4 className="mb-3 font-bold text-primary">Fin de réservation</h4>
+                      <h4 className="mb-3 font-bold text-primary">Fin de rÃ©servation</h4>
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-gray-700">
-                            Disponible à partir du
+                            Disponible Ã  partir du
                           </span>
                           <input
                             type="date"
@@ -614,18 +622,18 @@ export default function AdminPage() {
                             className="h-4 w-4"
                           />
                           <span className="text-sm font-semibold text-gray-800">
-                            Pas de date définie
+                            Pas de date dÃ©finie
                           </span>
                         </label>
                       </div>
                       <p className="mt-2 text-sm text-gray-600">
-                        Si tu coches “pas de date définie”, l’annonce affichera juste que le bien est réservé.
+                        Si tu coches â€œpas de date dÃ©finieâ€, lâ€™annonce affichera juste que le bien est rÃ©servÃ©.
                       </p>
                     </div>
                   )}
                   <div className="col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
                     <div className="mb-3">
-                      <h4 className="font-bold text-primary">Options / équipements</h4>
+                      <h4 className="font-bold text-primary">Options / Ã©quipements</h4>
                       <p className="text-sm text-gray-600">
                         Coche tout ce que tu veux afficher sur l&apos;annonce.
                       </p>
@@ -656,7 +664,7 @@ export default function AdminPage() {
                   </div>
                   <div className="col-span-2 flex gap-3">
                     <button type="submit" className="flex-1 bg-secondary hover:bg-opacity-90 text-white font-bold py-2 px-4 rounded-lg transition-all">
-                      {editingProperty ? 'Enregistrer les modifications' : 'Créer la propriété'}
+                      {editingProperty ? 'Enregistrer les modifications' : 'CrÃ©er la propriÃ©tÃ©'}
                     </button>
                     <button type="button" onClick={resetPropertyForm} className="rounded-lg border border-gray-300 px-5 py-2 font-bold text-gray-700 hover:bg-gray-50">
                       Annuler
@@ -684,7 +692,7 @@ export default function AdminPage() {
                     <div className="flex-1">
                       <h3 className="text-xl font-bold text-primary">{property.name}</h3>
                       <p className="text-gray-600">
-                        {property.bedrooms} chambre(s) • {property.area}m² • {property.price}€/mois
+                        {property.bedrooms} chambre(s) â€¢ {property.area}mÂ² â€¢ {property.price}â‚¬/mois
                       </p>
                       <span
                         className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold ${
@@ -736,11 +744,11 @@ export default function AdminPage() {
                           <p className="text-primary">{property.location}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-gray-600">Disponibilité</p>
+                          <p className="text-sm font-semibold text-gray-600">DisponibilitÃ©</p>
                           <p className="text-primary">{getAvailabilityLabel(property)}</p>
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-gray-600">Équipements</p>
+                          <p className="text-sm font-semibold text-gray-600">Ã‰quipements</p>
                           <div className="flex gap-2 flex-wrap">
                             {getSelectedFeatureOptions(property.features).map((feature) => (
                               <span
@@ -767,7 +775,7 @@ export default function AdminPage() {
             {bookings.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-lg">
                 <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-600 text-lg">Aucune réservation pour le moment</p>
+                <p className="text-gray-600 text-lg">Aucune rÃ©servation pour le moment</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -786,12 +794,12 @@ export default function AdminPage() {
                         </h3>
                         <p className="font-semibold text-gray-800">{booking.name}</p>
                         <p className="text-sm font-semibold text-secondary">
-                          Référence : {formatBookingReference(booking.id)}
+                          RÃ©fÃ©rence : {formatBookingReference(booking.id)}
                         </p>
                         <p className="text-gray-600">{booking.email}</p>
                         <p className="text-gray-600">{booking.phone}</p>
                         <p className="text-sm text-gray-500 mt-2">
-                          Date souhaitée : {formatFrenchDate(booking.checkInDate)}
+                          Date souhaitÃ©e : {formatFrenchDate(booking.checkInDate)}
                         </p>
                         <span
                           className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold ${getBookingStatusClass(booking.status)}`}
@@ -817,15 +825,15 @@ export default function AdminPage() {
                               className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
                             >
                               <option value="pending">En attente</option>
-                              <option value="confirmed">Confirmée</option>
-                              <option value="cancelled">Annulée</option>
+                              <option value="confirmed">ConfirmÃ©e</option>
+                              <option value="cancelled">AnnulÃ©e</option>
                             </select>
                           </label>
                           <a
                             href={getReplyMailLink(booking)}
                             className="inline-flex items-center justify-center rounded-lg bg-secondary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90"
                           >
-                            Répondre par mail
+                            RÃ©pondre par mail
                           </a>
                         </div>
                       </div>
@@ -848,13 +856,12 @@ export default function AdminPage() {
           <div className="space-y-4">
             {resetResult && (
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <p className="font-bold text-primary">Mot de passe réinitialisé</p>
+                <p className="font-bold text-primary">Lien de reset préparé</p>
                 <p className="text-sm text-gray-700">
-                  Compte : {resetResult.email} | Nouveau mot de passe :{' '}
-                  <span className="font-mono font-bold">{resetResult.password}</span>
+                  Compte : {resetResult.email}
                 </p>
                 <a
-                  href={getResetMailLink(resetResult.email, resetResult.password)}
+                  href={getResetMailLink(resetResult.email, resetResult.link)}
                   className="mt-3 inline-flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90"
                 >
                   <Mail size={16} />
@@ -866,7 +873,7 @@ export default function AdminPage() {
             {users.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-lg">
                 <Users size={48} className="mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-600 text-lg">Aucun compte stocké</p>
+                <p className="text-gray-600 text-lg">Aucun compte stockÃ©</p>
               </div>
             ) : (
               users.map((user) => (
@@ -891,7 +898,7 @@ export default function AdminPage() {
                         <p className="break-all font-mono text-sm font-bold text-gray-800">{user.password}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-500">Rôle</p>
+                        <p className="text-sm font-semibold text-gray-500">RÃ´le</p>
                         {user.id === PRIMARY_ADMIN_ID ? (
                           <span className="inline-block rounded-full bg-secondary px-3 py-1 text-sm font-bold text-white">
                             admin principal
@@ -919,7 +926,7 @@ export default function AdminPage() {
                         className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90"
                       >
                         <KeyRound size={16} />
-                        Reset + mail
+                        Envoyer lien reset
                       </button>
                     </div>
                   </div>
@@ -935,7 +942,7 @@ export default function AdminPage() {
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-primary">Logs</h2>
-                <p className="text-sm text-gray-600">Historique local des connexions, créations et resets.</p>
+                <p className="text-sm text-gray-600">Historique local des connexions, crÃ©ations et resets.</p>
               </div>
               <button
                 onClick={clearLogs}
