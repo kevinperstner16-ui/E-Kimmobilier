@@ -93,7 +93,7 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
       createdAt: new Date().toISOString(),
     });
 
-    alert('Merci ! Votre demande de visite a été enregistrée dans l’admin.');
+    alert('Merci ! Votre demande est bien prise en charge.');
     setFormData({ name: '', email: '', phone: '', visitDate: '', message: '' });
     setShowContactForm(false);
   };
