@@ -18,6 +18,7 @@ import {
   Users,
 } from 'lucide-react';
 import { Property } from '@/lib/types';
+import { FALLBACK_PROPERTY_IMAGE } from '@/lib/images';
 import {
   DEFAULT_PROPERTY_FEATURES,
   PROPERTY_FEATURE_OPTIONS,
@@ -117,7 +118,7 @@ export default function AdminPage() {
       description: formData.description || '',
       images: formData.images?.length
         ? formData.images
-        : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80'],
+        : [FALLBACK_PROPERTY_IMAGE],
       amenities: formData.amenities || [],
       available: formData.available ?? true,
       availableFrom: formData.available ? undefined : formData.availableFrom || undefined,
@@ -148,6 +149,36 @@ export default function AdminPage() {
         ...formData.features,
         [key]: checked,
       },
+    });
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    const uploadedImages = await Promise.all(
+      files.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+          })
+      )
+    );
+
+    setFormData({
+      ...formData,
+      images: [...(formData.images || []), ...uploadedImages],
+    });
+    event.target.value = '';
+  };
+
+  const removeImage = (indexToRemove: number) => {
+    setFormData({
+      ...formData,
+      images: (formData.images || []).filter((_, index) => index !== indexToRemove),
     });
   };
 
@@ -337,27 +368,83 @@ export default function AdminPage() {
                   />
                   <div className="col-span-2">
                     <label className="mb-1 block text-sm font-semibold text-gray-700">
-                      URLs des images
+                      Images de l’annonce
                     </label>
-                    <textarea
-                      name="imageUrls"
-                      placeholder={`Colle une ou plusieurs URLs, séparées par un espace ou une ligne.\nExemple :\nhttps://site.com/image1.jpg\nhttps://site.com/image2.jpg`}
-                      value={formData.images?.join('\n') || ''}
-                      onChange={(event) =>
-                        setFormData({
-                          ...formData,
-                          images: event.target.value
-                            .split(/\s+/)
-                            .map((url) => url.trim())
-                            .filter(Boolean),
-                        })
-                      }
-                      className="min-h-28 w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-secondary"
-                      rows={4}
-                    />
-                    <p className="mt-1 text-sm text-gray-500">
-                      La première URL sera l’image principale, les autres seront visibles dans la galerie.
-                    </p>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                      <label className="mb-3 block">
+                        <span className="mb-1 block text-sm font-semibold text-gray-700">
+                          Ajouter des photos depuis ton téléphone / PC
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleImageUpload}
+                          className="block w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-secondary file:px-4 file:py-2 file:font-bold file:text-white"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-1 block text-sm font-semibold text-gray-700">
+                          Ou ajouter des URLs d’images
+                        </span>
+                        <textarea
+                          name="imageUrls"
+                          placeholder={`Tu peux écrire/coller une URL par ligne, ou les séparer par un espace.\nhttps://site.com/image1.jpg\nhttps://site.com/image2.jpg`}
+                          value={(formData.images || []).filter((image) => !image.startsWith('data:')).join('\n')}
+                          onChange={(event) => {
+                            const uploadedImages = (formData.images || []).filter((image) =>
+                              image.startsWith('data:')
+                            );
+                            const urlImages = event.target.value
+                              .split(/\s+/)
+                              .map((url) => url.trim())
+                              .filter(Boolean);
+
+                            setFormData({
+                              ...formData,
+                              images: [...uploadedImages, ...urlImages],
+                            });
+                          }}
+                          className="min-h-28 w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-secondary"
+                          rows={4}
+                        />
+                      </label>
+
+                      <p className="mt-2 text-sm text-gray-500">
+                        La première image sera l’image principale. Les liens Pinterest/Pixabay peuvent parfois être bloqués par le site source : dans ce cas, l’upload fichier est plus fiable.
+                      </p>
+
+                      {(formData.images || []).length > 0 && (
+                        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                          {(formData.images || []).map((image, index) => (
+                            <div key={`${image}-${index}`} className="relative overflow-hidden rounded-lg border bg-white">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={image}
+                                alt={`Image ${index + 1}`}
+                                className="h-24 w-full object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.src = FALLBACK_PROPERTY_IMAGE;
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeImage(index)}
+                                className="absolute right-1 top-1 rounded bg-red-600 px-2 py-1 text-xs font-bold text-white"
+                              >
+                                X
+                              </button>
+                              {index === 0 && (
+                                <span className="absolute bottom-1 left-1 rounded bg-black bg-opacity-70 px-2 py-1 text-xs font-semibold text-white">
+                                  Principale
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <label className="flex items-center gap-2 col-span-2">
                     <input

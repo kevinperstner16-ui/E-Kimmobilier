@@ -20,6 +20,7 @@ import {
 import Link from 'next/link';
 import { getSelectedFeatureOptions } from '@/lib/property-options';
 import { getAvailabilityLabel } from '@/lib/availability';
+import { FALLBACK_PROPERTY_IMAGE, getPropertyImage } from '@/lib/images';
 
 interface PropertyDetailClientProps {
   id: string;
@@ -126,11 +127,14 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
             >
               <div className="relative h-96 bg-gray-200 rounded-lg overflow-hidden">
                 <Image
-                  src={property.images[currentImageIndex]}
+                  src={getPropertyImage(property.images, currentImageIndex)}
                   alt={`${property.name} - Image ${currentImageIndex + 1}`}
                   width={800}
                   height={400}
                   className="w-full h-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.src = FALLBACK_PROPERTY_IMAGE;
+                  }}
                 />
               </div>
 
@@ -407,11 +411,14 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
                   >
                     <div className="relative h-48 bg-gray-200">
                       <Image
-                        src={relatedProperty.images[0]}
+                        src={getPropertyImage(relatedProperty.images)}
                         alt={relatedProperty.name}
                         width={400}
                         height={300}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        onError={(event) => {
+                          event.currentTarget.src = FALLBACK_PROPERTY_IMAGE;
+                        }}
                       />
                     </div>
                     <div className="p-4">

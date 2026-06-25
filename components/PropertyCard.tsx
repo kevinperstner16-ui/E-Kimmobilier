@@ -14,6 +14,7 @@ import {
 import { motion } from 'framer-motion';
 import { getSelectedFeatureOptions } from '@/lib/property-options';
 import { getAvailabilityShortLabel } from '@/lib/availability';
+import { FALLBACK_PROPERTY_IMAGE, getPropertyImage } from '@/lib/images';
 
 interface PropertyCardProps {
   property: Property;
@@ -35,11 +36,14 @@ export default function PropertyCard({ property }: PropertyCardProps) {
       {/* Image Gallery */}
       <div className="relative h-64 overflow-hidden bg-gray-200">
         <Image
-          src={property.images[0]}
+          src={getPropertyImage(property.images)}
           alt={property.name}
           width={500}
           height={300}
           className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
+          onError={(event) => {
+            event.currentTarget.src = FALLBACK_PROPERTY_IMAGE;
+          }}
         />
         <div className="absolute top-4 right-4">
           <div
