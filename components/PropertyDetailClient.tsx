@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { getSelectedFeatureOptions } from '@/lib/property-options';
+import { getAvailabilityLabel } from '@/lib/availability';
 
 interface PropertyDetailClientProps {
   id: string;
@@ -167,9 +168,9 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
                 <p className="text-2xl font-bold text-secondary mb-2">
                   {property.price}€<span className="text-lg text-gray-600 font-normal">/mois</span>
                 </p>
-                {!property.available && property.availableFrom && (
+                {!property.available && (
                   <p className="text-sm text-orange-600">
-                    Disponible à partir du {new Date(property.availableFrom).toLocaleDateString('fr-FR')}
+                    {getAvailabilityLabel(property)}
                   </p>
                 )}
               </div>
@@ -191,7 +192,7 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
                   ) : (
                     <>
                       <Clock size={20} />
-                      Actuellement réservé
+                      {getAvailabilityLabel(property)}
                     </>
                   )}
                 </div>

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getSelectedFeatureOptions } from '@/lib/property-options';
+import { getAvailabilityShortLabel } from '@/lib/availability';
 
 interface PropertyCardProps {
   property: Property;
@@ -51,12 +52,12 @@ export default function PropertyCard({ property }: PropertyCardProps) {
             {property.available ? (
               <div className="flex items-center gap-1">
                 <Check size={16} />
-                Disponible
+                {getAvailabilityShortLabel(property)}
               </div>
             ) : (
               <div className="flex items-center gap-1">
                 <Clock size={16} />
-                Réservé
+                {getAvailabilityShortLabel(property)}
               </div>
             )}
           </div>
@@ -79,6 +80,11 @@ export default function PropertyCard({ property }: PropertyCardProps) {
             {property.price}€
             <span className="text-lg text-gray-600 font-normal">/mois</span>
           </div>
+          {!property.available && (
+            <p className="mt-1 text-sm font-semibold text-red-600">
+              {getAvailabilityShortLabel(property)}
+            </p>
+          )}
         </div>
 
         {/* Description */}

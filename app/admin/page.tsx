@@ -23,6 +23,7 @@ import {
   PROPERTY_FEATURE_OPTIONS,
   getSelectedFeatureOptions,
 } from '@/lib/property-options';
+import { getAvailabilityLabel } from '@/lib/availability';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -53,6 +54,7 @@ export default function AdminPage() {
     images: [],
     amenities: [],
     available: true,
+    availableFrom: '',
     features: DEFAULT_PROPERTY_FEATURES,
   });
 
@@ -75,6 +77,7 @@ export default function AdminPage() {
       images: [],
       amenities: [],
       available: true,
+      availableFrom: '',
       features: DEFAULT_PROPERTY_FEATURES,
     });
     setEditingProperty(null);
@@ -92,8 +95,13 @@ export default function AdminPage() {
 
   const handlePropertySubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedFormData = {
+      ...formData,
+      availableFrom: formData.available ? undefined : formData.availableFrom || undefined,
+    };
+
     if (editingProperty) {
-      updateProperty(editingProperty, formData);
+      updateProperty(editingProperty, normalizedFormData);
       resetPropertyForm();
       return;
     }
@@ -112,6 +120,7 @@ export default function AdminPage() {
         : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80'],
       amenities: formData.amenities || [],
       available: formData.available ?? true,
+      availableFrom: formData.available ? undefined : formData.availableFrom || undefined,
       features: { ...DEFAULT_PROPERTY_FEATURES, ...formData.features },
     };
     addProperty(newProperty);
@@ -124,6 +133,7 @@ export default function AdminPage() {
       ...property,
       images: [...property.images],
       amenities: [...property.amenities],
+      availableFrom: property.availableFrom || '',
       features: { ...DEFAULT_PROPERTY_FEATURES, ...property.features },
     });
     setShowAddPropertyForm(true);
@@ -340,11 +350,58 @@ export default function AdminPage() {
                       type="checkbox"
                       name="available"
                       checked={formData.available || false}
-                      onChange={handleFormChange}
+                      onChange={(event) =>
+                        setFormData({
+                          ...formData,
+                          available: event.target.checked,
+                          availableFrom: event.target.checked ? '' : formData.availableFrom || '',
+                        })
+                      }
                       className="w-4 h-4"
                     />
                     <span>Disponible</span>
                   </label>
+                  {!formData.available && (
+                    <div className="col-span-2 rounded-lg border border-orange-200 bg-orange-50 p-4">
+                      <h4 className="mb-3 font-bold text-primary">Fin de réservation</h4>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-gray-700">
+                            Disponible à partir du
+                          </span>
+                          <input
+                            type="date"
+                            name="availableFrom"
+                            value={formData.availableFrom || ''}
+                            onChange={handleFormChange}
+                            disabled={!formData.availableFrom}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-secondary disabled:bg-gray-100 disabled:text-gray-400"
+                          />
+                        </label>
+                        <label className="flex items-center gap-2 rounded-lg bg-white p-3">
+                          <input
+                            type="checkbox"
+                            checked={!formData.availableFrom}
+                            onChange={(event) =>
+                              setFormData({
+                                ...formData,
+                                availableFrom: event.target.checked
+                                  ? ''
+                                  : new Date().toISOString().slice(0, 10),
+                              })
+                            }
+                            className="h-4 w-4"
+                          />
+                          <span className="text-sm font-semibold text-gray-800">
+                            Pas de date définie
+                          </span>
+                        </label>
+                      </div>
+                      <p className="mt-2 text-sm text-gray-600">
+                        Si tu coches “pas de date définie”, l’annonce affichera juste que le bien est réservé.
+                      </p>
+                    </div>
+                  )}
                   <div className="col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
                     <div className="mb-3">
                       <h4 className="font-bold text-primary">Options / équipements</h4>
@@ -415,7 +472,7 @@ export default function AdminPage() {
                             : 'bg-red-100 text-red-800'
                         }`}
                       >
-                        {property.available ? 'Disponible' : 'Réservé'}
+                        {getAvailabilityLabel(property)}
                       </span>
                     </div>
                     <div className="flex gap-2">
@@ -456,6 +513,10 @@ export default function AdminPage() {
                         <div>
                           <p className="text-sm font-semibold text-gray-600">Localisation</p>
                           <p className="text-primary">{property.location}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-600">Disponibilité</p>
+                          <p className="text-primary">{getAvailabilityLabel(property)}</p>
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-gray-600">Équipements</p>
