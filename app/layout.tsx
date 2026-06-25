@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import DatabaseSync from '@/components/DatabaseSync';
+import AiHelpWidget from '@/components/AiHelpWidget';
 
 export const metadata: Metadata = {
   title: 'E&K Immobilier - Trouvez votre chez-vous',
@@ -19,6 +20,7 @@ export default function RootLayout({
       <body className="bg-white">
         <DatabaseSync />
         {children}
+        <AiHelpWidget />
       </body>
     </html>
   );
