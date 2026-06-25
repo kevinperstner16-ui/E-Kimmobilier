@@ -17,7 +17,7 @@ import {
   Calendar,
   Users,
 } from 'lucide-react';
-import { Property } from '@/lib/types';
+import { Booking, Property } from '@/lib/types';
 import { FALLBACK_PROPERTY_IMAGE } from '@/lib/images';
 import {
   DEFAULT_PROPERTY_FEATURES,
@@ -36,6 +36,7 @@ export default function AdminPage() {
     addProperty,
     updateProperty,
     deleteProperty,
+    updateBooking,
     deleteBooking,
   } = usePropertyStore();
 
@@ -180,6 +181,30 @@ export default function AdminPage() {
       ...formData,
       images: (formData.images || []).filter((_, index) => index !== indexToRemove),
     });
+  };
+
+  const getBookingStatusLabel = (status: 'pending' | 'confirmed' | 'cancelled') => {
+    if (status === 'confirmed') return 'Confirmée';
+    if (status === 'cancelled') return 'Annulée';
+    return 'En attente';
+  };
+
+  const getReplyMailLink = (booking: Booking) => {
+    const property = properties.find((item) => item.id === booking.propertyId);
+    const subject = `Votre demande de visite - ${property?.name || 'E&K Immobilier'}`;
+    const body = [
+      `Bonjour ${booking.name},`,
+      '',
+      `Merci pour votre demande concernant ${property?.name || 'notre annonce'}.`,
+      `Date souhaitée : ${formatFrenchDate(booking.checkInDate)}`,
+      '',
+      'Nous revenons vers vous concernant votre demande.',
+      '',
+      'Cordialement,',
+      'E&K Immobilier',
+    ].join('\n');
+
+    return `mailto:${booking.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   if (!authChecked || currentUser?.role !== 'admin') {
@@ -679,8 +704,38 @@ export default function AdminPage() {
                               : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {booking.status}
+                          {getBookingStatusLabel(booking.status)}
                         </span>
+                        {booking.message && (
+                          <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                            <p className="text-sm font-semibold text-gray-500">Message</p>
+                            <p className="text-gray-700">{booking.message}</p>
+                          </div>
+                        )}
+                        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <label className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-gray-700">Statut :</span>
+                            <select
+                              value={booking.status}
+                              onChange={(event) =>
+                                updateBooking(booking.id, {
+                                  status: event.target.value as Booking['status'],
+                                })
+                              }
+                              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                            >
+                              <option value="pending">En attente</option>
+                              <option value="confirmed">Confirmée</option>
+                              <option value="cancelled">Annulée</option>
+                            </select>
+                          </label>
+                          <a
+                            href={getReplyMailLink(booking)}
+                            className="inline-flex items-center justify-center rounded-lg bg-secondary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90"
+                          >
+                            Répondre par mail
+                          </a>
+                        </div>
                       </div>
                       <button
                         onClick={() => deleteBooking(booking.id)}
