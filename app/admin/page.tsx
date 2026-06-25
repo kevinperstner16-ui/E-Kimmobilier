@@ -23,7 +23,7 @@ import {
   PROPERTY_FEATURE_OPTIONS,
   getSelectedFeatureOptions,
 } from '@/lib/property-options';
-import { getAvailabilityLabel } from '@/lib/availability';
+import { formatFrenchDate, getAvailabilityLabel } from '@/lib/availability';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -573,11 +573,15 @@ export default function AdminPage() {
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <h3 className="text-xl font-bold text-primary">{booking.name}</h3>
+                        <h3 className="text-xl font-bold text-primary">
+                          {properties.find((property) => property.id === booking.propertyId)?.name ||
+                            `Annonce #${booking.propertyId}`}
+                        </h3>
+                        <p className="font-semibold text-gray-800">{booking.name}</p>
                         <p className="text-gray-600">{booking.email}</p>
                         <p className="text-gray-600">{booking.phone}</p>
                         <p className="text-sm text-gray-500 mt-2">
-                          {booking.checkInDate} → {booking.checkOutDate}
+                          Date souhaitée : {formatFrenchDate(booking.checkInDate)}
                         </p>
                         <span
                           className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold ${

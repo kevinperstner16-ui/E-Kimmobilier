@@ -27,6 +27,7 @@ interface PropertyDetailClientProps {
 
 export default function PropertyDetailClient({ id }: PropertyDetailClientProps) {
   const properties = usePropertyStore((state) => state.properties);
+  const addBooking = usePropertyStore((state) => state.addBooking);
   const property = properties.find((p) => p.id === id);
   const selectedFeatures = property ? getSelectedFeatureOptions(property.features) : [];
 
@@ -36,6 +37,7 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
     name: '',
     email: '',
     phone: '',
+    visitDate: '',
     message: '',
   });
 
@@ -77,8 +79,21 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    alert('Merci ! Votre demande a été envoyée.');
-    setFormData({ name: '', email: '', phone: '', message: '' });
+    addBooking({
+      id: Date.now().toString(),
+      propertyId: property.id,
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      checkInDate: formData.visitDate || new Date().toISOString().slice(0, 10),
+      checkOutDate: formData.visitDate || new Date().toISOString().slice(0, 10),
+      message: formData.message || `Demande de visite pour ${property.name}`,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    });
+
+    alert('Merci ! Votre demande de visite a été enregistrée dans l’admin.');
+    setFormData({ name: '', email: '', phone: '', visitDate: '', message: '' });
     setShowContactForm(false);
   };
 
@@ -309,6 +324,19 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
                       onChange={handleFormChange}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary"
                       placeholder="Votre numéro"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Date souhaitée
+                    </label>
+                    <input
+                      type="date"
+                      name="visitDate"
+                      value={formData.visitDate}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary"
                     />
                   </div>
 

@@ -36,6 +36,11 @@ jobs:
         env:
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
 
+      - name: Prepare GitHub Pages files
+        run: |
+          touch out/.nojekyll
+          cp out/index.html out/404.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
