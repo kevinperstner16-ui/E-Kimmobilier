@@ -11,14 +11,29 @@ export type Property = {
   amenities: string[];
   available: boolean;
   availableFrom?: string;
-  features: {
-    wifi: boolean;
-    parking: boolean;
-    heating: boolean;
-    airConditioning: boolean;
-    kitchen: boolean;
-    balcony: boolean;
-  };
+  features: PropertyFeatures;
+};
+
+export type PropertyFeatures = {
+  wifi?: boolean;
+  parking?: boolean;
+  heating?: boolean;
+  airConditioning?: boolean;
+  kitchen?: boolean;
+  balcony?: boolean;
+  elevator?: boolean;
+  furnished?: boolean;
+  washingMachine?: boolean;
+  dishwasher?: boolean;
+  tv?: boolean;
+  terrace?: boolean;
+  garden?: boolean;
+  pool?: boolean;
+  gym?: boolean;
+  security?: boolean;
+  concierge?: boolean;
+  petsAllowed?: boolean;
+  storage?: boolean;
 };
 
 export type Booking = {

@@ -10,18 +10,19 @@ import {
   MapPin,
   Check,
   Clock,
-  Wifi,
-  ParkingCircle,
-  Wind,
-  AirVent,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getSelectedFeatureOptions } from '@/lib/property-options';
 
 interface PropertyCardProps {
   property: Property;
 }
 
 export default function PropertyCard({ property }: PropertyCardProps) {
+  const selectedFeatures = getSelectedFeatureOptions(property.features);
+  const previewFeatures = selectedFeatures.slice(0, 5);
+  const remainingFeaturesCount = selectedFeatures.length - previewFeatures.length;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -116,28 +117,22 @@ export default function PropertyCard({ property }: PropertyCardProps) {
             Équipements
           </h4>
           <div className="flex flex-wrap gap-2">
-            {property.features.wifi && (
-              <div className="flex items-center gap-1 bg-blue-50 px-2 py-1 rounded text-xs">
-                <Wifi size={14} className="text-blue-600" />
-                <span>WiFi</span>
-              </div>
-            )}
-            {property.features.parking && (
-              <div className="flex items-center gap-1 bg-purple-50 px-2 py-1 rounded text-xs">
-                <ParkingCircle size={14} className="text-purple-600" />
-                <span>Parking</span>
-              </div>
-            )}
-            {property.features.airConditioning && (
-              <div className="flex items-center gap-1 bg-cyan-50 px-2 py-1 rounded text-xs">
-                <AirVent size={14} className="text-cyan-600" />
-                <span>Clim</span>
-              </div>
-            )}
-            {property.features.heating && (
-              <div className="flex items-center gap-1 bg-orange-50 px-2 py-1 rounded text-xs">
-                <Wind size={14} className="text-orange-600" />
-                <span>Chauffage</span>
+            {previewFeatures.map((feature) => {
+              const Icon = feature.icon;
+
+              return (
+                <div
+                  key={feature.key}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${feature.colorClass}`}
+                >
+                  <Icon size={14} />
+                  <span>{feature.shortLabel}</span>
+                </div>
+              );
+            })}
+            {remainingFeaturesCount > 0 && (
+              <div className="flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
+                +{remainingFeaturesCount}
               </div>
             )}
           </div>

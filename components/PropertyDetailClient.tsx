@@ -13,15 +13,12 @@ import {
   MapPin,
   Check,
   Clock,
-  Wifi,
-  ParkingCircle,
-  Wind,
-  AirVent,
   ChevronLeft,
   ChevronRight,
   Send,
 } from 'lucide-react';
 import Link from 'next/link';
+import { getSelectedFeatureOptions } from '@/lib/property-options';
 
 interface PropertyDetailClientProps {
   id: string;
@@ -30,6 +27,7 @@ interface PropertyDetailClientProps {
 export default function PropertyDetailClient({ id }: PropertyDetailClientProps) {
   const properties = usePropertyStore((state) => state.properties);
   const property = properties.find((p) => p.id === id);
+  const selectedFeatures = property ? getSelectedFeatureOptions(property.features) : [];
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showContactForm, setShowContactForm] = useState(false);
@@ -228,39 +226,22 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
               <div className="mb-8">
                 <h2 className="text-2xl font-bold text-primary mb-4">Équipements</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {property.features.wifi && (
-                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                      <Wifi size={24} className="text-blue-600" />
-                      <span className="font-semibold">WiFi Haut Débit</span>
-                    </div>
-                  )}
-                  {property.features.parking && (
-                    <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
-                      <ParkingCircle size={24} className="text-purple-600" />
-                      <span className="font-semibold">Parking</span>
-                    </div>
-                  )}
-                  {property.features.airConditioning && (
-                    <div className="flex items-center gap-3 p-3 bg-cyan-50 rounded-lg">
-                      <AirVent size={24} className="text-cyan-600" />
-                      <span className="font-semibold">Climatisation</span>
-                    </div>
-                  )}
-                  {property.features.heating && (
-                    <div className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg">
-                      <Wind size={24} className="text-orange-600" />
-                      <span className="font-semibold">Chauffage</span>
-                    </div>
-                  )}
-                  {property.features.kitchen && (
-                    <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
-                      <span className="font-semibold">🍳 Cuisine Équipée</span>
-                    </div>
-                  )}
-                  {property.features.balcony && (
-                    <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                      <span className="font-semibold">🌳 Balcon</span>
-                    </div>
+                  {selectedFeatures.length ? (
+                    selectedFeatures.map((feature) => {
+                      const Icon = feature.icon;
+
+                      return (
+                        <div
+                          key={feature.key}
+                          className={`flex items-center gap-3 p-3 rounded-lg ${feature.colorClass}`}
+                        >
+                          <Icon size={24} />
+                          <span className="font-semibold">{feature.label}</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-gray-600">Aucun équipement renseigné.</p>
                   )}
                 </div>
               </div>

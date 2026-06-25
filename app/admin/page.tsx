@@ -18,6 +18,11 @@ import {
   Users,
 } from 'lucide-react';
 import { Property } from '@/lib/types';
+import {
+  DEFAULT_PROPERTY_FEATURES,
+  PROPERTY_FEATURE_OPTIONS,
+  getSelectedFeatureOptions,
+} from '@/lib/property-options';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -48,14 +53,7 @@ export default function AdminPage() {
     images: [],
     amenities: [],
     available: true,
-    features: {
-      wifi: true,
-      parking: false,
-      heating: true,
-      airConditioning: true,
-      kitchen: true,
-      balcony: false,
-    },
+    features: DEFAULT_PROPERTY_FEATURES,
   });
 
   useEffect(() => {
@@ -77,14 +75,7 @@ export default function AdminPage() {
       images: [],
       amenities: [],
       available: true,
-      features: {
-        wifi: true,
-        parking: false,
-        heating: true,
-        airConditioning: true,
-        kitchen: true,
-        balcony: false,
-      },
+      features: DEFAULT_PROPERTY_FEATURES,
     });
     setEditingProperty(null);
     setShowAddPropertyForm(false);
@@ -121,14 +112,7 @@ export default function AdminPage() {
         : ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80'],
       amenities: formData.amenities || [],
       available: formData.available ?? true,
-      features: formData.features || {
-        wifi: true,
-        parking: false,
-        heating: true,
-        airConditioning: true,
-        kitchen: true,
-        balcony: false,
-      },
+      features: { ...DEFAULT_PROPERTY_FEATURES, ...formData.features },
     };
     addProperty(newProperty);
     resetPropertyForm();
@@ -140,10 +124,21 @@ export default function AdminPage() {
       ...property,
       images: [...property.images],
       amenities: [...property.amenities],
-      features: { ...property.features },
+      features: { ...DEFAULT_PROPERTY_FEATURES, ...property.features },
     });
     setShowAddPropertyForm(true);
     window.scrollTo({ top: 300, behavior: 'smooth' });
+  };
+
+  const handleFeatureChange = (key: keyof Property['features'], checked: boolean) => {
+    setFormData({
+      ...formData,
+      features: {
+        ...DEFAULT_PROPERTY_FEATURES,
+        ...formData.features,
+        [key]: checked,
+      },
+    });
   };
 
   if (!authChecked || currentUser?.role !== 'admin') {
@@ -350,6 +345,37 @@ export default function AdminPage() {
                     />
                     <span>Disponible</span>
                   </label>
+                  <div className="col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <div className="mb-3">
+                      <h4 className="font-bold text-primary">Options / équipements</h4>
+                      <p className="text-sm text-gray-600">
+                        Coche tout ce que tu veux afficher sur l&apos;annonce.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {PROPERTY_FEATURE_OPTIONS.map((option) => {
+                        const Icon = option.icon;
+
+                        return (
+                          <label
+                            key={option.key}
+                            className="flex cursor-pointer items-center gap-3 rounded-lg bg-white p-3 shadow-sm hover:bg-gray-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={Boolean(formData.features?.[option.key])}
+                              onChange={(event) => handleFeatureChange(option.key, event.target.checked)}
+                              className="h-4 w-4"
+                            />
+                            <span className={`flex h-8 w-8 items-center justify-center rounded-full ${option.colorClass}`}>
+                              <Icon size={18} />
+                            </span>
+                            <span className="text-sm font-semibold text-gray-800">{option.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
                   <div className="col-span-2 flex gap-3">
                     <button type="submit" className="flex-1 bg-secondary hover:bg-opacity-90 text-white font-bold py-2 px-4 rounded-lg transition-all">
                       {editingProperty ? 'Enregistrer les modifications' : 'Créer la propriété'}
@@ -434,21 +460,14 @@ export default function AdminPage() {
                         <div>
                           <p className="text-sm font-semibold text-gray-600">Équipements</p>
                           <div className="flex gap-2 flex-wrap">
-                            {property.features.wifi && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                WiFi
+                            {getSelectedFeatureOptions(property.features).map((feature) => (
+                              <span
+                                key={feature.key}
+                                className={`text-xs px-2 py-1 rounded ${feature.colorClass}`}
+                              >
+                                {feature.shortLabel}
                               </span>
-                            )}
-                            {property.features.parking && (
-                              <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                                Parking
-                              </span>
-                            )}
-                            {property.features.airConditioning && (
-                              <span className="text-xs bg-cyan-100 text-cyan-800 px-2 py-1 rounded">
-                                Clim
-                              </span>
-                            )}
+                            ))}
                           </div>
                         </div>
                       </div>
