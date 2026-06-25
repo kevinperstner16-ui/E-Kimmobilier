@@ -67,8 +67,8 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-primary mb-1">Téléphone</h3>
-                    <p className="text-gray-600">+33 1 23 45 67 89</p>
-                    <p className="text-gray-600">+33 1 98 76 54 32</p>
+                    <p className="text-gray-600">+33 6 06 73 77 99</p>
+                    <p className="text-gray-600">+33 6 7064 06 84</p>
                   </div>
                 </div>
 
@@ -89,8 +89,8 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-primary mb-1">Adresse</h3>
-                    <p className="text-gray-600">123 Avenue de la Paix</p>
-                    <p className="text-gray-600">75000 Paris, France</p>
+                    <p className="text-gray-600">NANCY</p>
+                    <p className="text-gray-600">54000, Nancy</p>
                   </div>
                 </div>
 

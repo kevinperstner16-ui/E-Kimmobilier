@@ -25,6 +25,7 @@ import {
   getSelectedFeatureOptions,
 } from '@/lib/property-options';
 import { formatFrenchDate, getAvailabilityLabel } from '@/lib/availability';
+import { formatBookingReference, getBookingStatusClass, getBookingStatusLabel } from '@/lib/bookings';
 
 export default function AdminPage() {
   const router = useRouter();
@@ -181,12 +182,6 @@ export default function AdminPage() {
       ...formData,
       images: (formData.images || []).filter((_, index) => index !== indexToRemove),
     });
-  };
-
-  const getBookingStatusLabel = (status: 'pending' | 'confirmed' | 'cancelled') => {
-    if (status === 'confirmed') return 'Confirmée';
-    if (status === 'cancelled') return 'Annulée';
-    return 'En attente';
   };
 
   const getReplyMailLink = (booking: Booking) => {
@@ -690,19 +685,16 @@ export default function AdminPage() {
                             `Annonce #${booking.propertyId}`}
                         </h3>
                         <p className="font-semibold text-gray-800">{booking.name}</p>
+                        <p className="text-sm font-semibold text-secondary">
+                          Référence : {formatBookingReference(booking.id)}
+                        </p>
                         <p className="text-gray-600">{booking.email}</p>
                         <p className="text-gray-600">{booking.phone}</p>
                         <p className="text-sm text-gray-500 mt-2">
                           Date souhaitée : {formatFrenchDate(booking.checkInDate)}
                         </p>
                         <span
-                          className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold ${
-                            booking.status === 'confirmed'
-                              ? 'bg-green-100 text-green-800'
-                              : booking.status === 'pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
+                          className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold ${getBookingStatusClass(booking.status)}`}
                         >
                           {getBookingStatusLabel(booking.status)}
                         </span>

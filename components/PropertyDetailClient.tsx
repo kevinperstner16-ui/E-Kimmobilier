@@ -5,6 +5,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import Image from 'next/image';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Bed,
@@ -21,12 +22,14 @@ import Link from 'next/link';
 import { getSelectedFeatureOptions } from '@/lib/property-options';
 import { getAvailabilityLabel } from '@/lib/availability';
 import { FALLBACK_PROPERTY_IMAGE, getPropertyImage } from '@/lib/images';
+import { formatBookingReference } from '@/lib/bookings';
 
 interface PropertyDetailClientProps {
   id: string;
 }
 
 export default function PropertyDetailClient({ id }: PropertyDetailClientProps) {
+  const router = useRouter();
   const properties = usePropertyStore((state) => state.properties);
   const addBooking = usePropertyStore((state) => state.addBooking);
   const property = properties.find((p) => p.id === id);
@@ -80,8 +83,10 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const bookingId = Date.now().toString();
+
     addBooking({
-      id: Date.now().toString(),
+      id: bookingId,
       propertyId: property.id,
       name: formData.name,
       email: formData.email,
@@ -93,9 +98,10 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
       createdAt: new Date().toISOString(),
     });
 
-    alert('Merci ! Votre demande est bien prise en charge.');
+    alert(`Merci ! Votre demande est bien prise en charge.\nRéférence : ${formatBookingReference(bookingId)}`);
     setFormData({ name: '', email: '', phone: '', visitDate: '', message: '' });
     setShowContactForm(false);
+    router.push(`/suivi?ref=${encodeURIComponent(bookingId)}&email=${encodeURIComponent(formData.email)}`);
   };
 
   return (

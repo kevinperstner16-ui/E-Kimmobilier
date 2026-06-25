@@ -62,6 +62,12 @@ export default function Header() {
             >
               Contact
             </Link>
+            <Link
+              href="/suivi"
+              className="text-gray-700 hover:text-secondary transition-colors"
+            >
+              Suivi demande
+            </Link>
             {mounted && currentUser?.role === 'admin' && (
               <Link href="/admin" className="text-gray-700 hover:text-secondary transition-colors">
                 Admin
@@ -122,6 +128,13 @@ export default function Header() {
               className="block text-gray-700 hover:text-secondary transition-colors py-2"
             >
               Contact
+            </Link>
+            <Link
+              href="/suivi"
+              onClick={() => setIsOpen(false)}
+              className="block text-gray-700 hover:text-secondary transition-colors py-2"
+            >
+              Suivi demande
             </Link>
             {mounted && currentUser?.role === 'admin' && (
               <Link href="/admin" onClick={() => setIsOpen(false)} className="block py-2 text-gray-700 hover:text-secondary">
