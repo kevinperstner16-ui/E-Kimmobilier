@@ -68,7 +68,7 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-bold text-primary mb-1">Téléphone</h3>
                     <p className="text-gray-600">+33 6 06 73 77 99</p>
-                    <p className="text-gray-600">+33 6 7064 06 84</p>
+                    <p className="text-gray-600">+33 6 70 64 06 84</p>
                   </div>
                 </div>
 

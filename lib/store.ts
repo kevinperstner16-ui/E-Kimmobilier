@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Property, Booking } from './types';
+import { database } from '@/backend/supabase/repository';
 
 interface PropertyStore {
   properties: Property[];
@@ -15,6 +16,7 @@ interface PropertyStore {
   deleteBooking: (id: string) => void;
   setProperties: (properties: Property[]) => void;
   setBookings: (bookings: Booking[]) => void;
+  loadFromDatabase: () => Promise<void>;
 }
 
 export const usePropertyStore = create<PropertyStore>()(persist((set) => {
@@ -77,32 +79,60 @@ export const usePropertyStore = create<PropertyStore>()(persist((set) => {
   return {
     properties: defaultProperties,
     bookings: [],
-    addProperty: (property) =>
-      set((state) => ({ properties: [...state.properties, property] })),
-    updateProperty: (id, updatedProperty) =>
+    addProperty: (property) => {
+      set((state) => ({ properties: [...state.properties, property] }));
+      void database.upsertProperty(property).catch(console.error);
+    },
+    updateProperty: (id, updatedProperty) => {
       set((state) => ({
         properties: state.properties.map((p) =>
           p.id === id ? { ...p, ...updatedProperty } : p
         ),
-      })),
-    deleteProperty: (id) =>
+      }));
+      void database.updateProperty(id, updatedProperty).catch(console.error);
+    },
+    deleteProperty: (id) => {
       set((state) => ({
         properties: state.properties.filter((p) => p.id !== id),
-      })),
-    addBooking: (booking) =>
-      set((state) => ({ bookings: [...state.bookings, booking] })),
-    updateBooking: (id, updatedBooking) =>
+      }));
+      void database.deleteProperty(id).catch(console.error);
+    },
+    addBooking: (booking) => {
+      set((state) => ({ bookings: [...state.bookings, booking] }));
+      void database.upsertBooking(booking).catch(console.error);
+    },
+    updateBooking: (id, updatedBooking) => {
       set((state) => ({
         bookings: state.bookings.map((b) =>
           b.id === id ? { ...b, ...updatedBooking } : b
         ),
-      })),
-    deleteBooking: (id) =>
+      }));
+      void database.updateBooking(id, updatedBooking).catch(console.error);
+    },
+    deleteBooking: (id) => {
       set((state) => ({
         bookings: state.bookings.filter((b) => b.id !== id),
-      })),
+      }));
+      void database.deleteBooking(id).catch(console.error);
+    },
     setProperties: (properties) => set({ properties }),
     setBookings: (bookings) => set({ bookings }),
+    loadFromDatabase: async () => {
+      if (!database.isEnabled()) return;
+
+      const [properties, bookings] = await Promise.all([
+        database.getProperties(),
+        database.getBookings(),
+      ]);
+
+      if (properties?.length) {
+        set({ properties });
+      }
+
+      if (bookings) {
+        set({ bookings });
+      }
+    },
   };
 }, {
   name: 'ek-properties',

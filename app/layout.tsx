@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import DatabaseSync from '@/components/DatabaseSync';
 
 export const metadata: Metadata = {
   title: 'E&K Immobilier - Trouvez votre chez-vous',
@@ -16,6 +17,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className="bg-white">
+        <DatabaseSync />
         {children}
       </body>
     </html>
