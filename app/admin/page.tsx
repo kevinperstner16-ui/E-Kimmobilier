@@ -16,6 +16,9 @@ import {
   Home,
   Calendar,
   Users,
+  KeyRound,
+  Mail,
+  ClipboardList,
 } from 'lucide-react';
 import { Booking, Property } from '@/lib/types';
 import { FALLBACK_PROPERTY_IMAGE } from '@/lib/images';
@@ -30,6 +33,10 @@ import { formatBookingReference, getBookingStatusClass, getBookingStatusLabel } 
 export default function AdminPage() {
   const router = useRouter();
   const currentUser = useAuthStore((state) => state.currentUser);
+  const users = useAuthStore((state) => state.users);
+  const logs = useAuthStore((state) => state.logs);
+  const resetPassword = useAuthStore((state) => state.resetPassword);
+  const clearLogs = useAuthStore((state) => state.clearLogs);
   const [authChecked, setAuthChecked] = useState(false);
   const {
     properties,
@@ -41,10 +48,11 @@ export default function AdminPage() {
     deleteBooking,
   } = usePropertyStore();
 
-  const [activeTab, setActiveTab] = useState<'properties' | 'bookings'>('properties');
+  const [activeTab, setActiveTab] = useState<'properties' | 'bookings' | 'accounts' | 'logs'>('properties');
   const [expandedProperty, setExpandedProperty] = useState<string | null>(null);
   const [showAddPropertyForm, setShowAddPropertyForm] = useState(false);
   const [editingProperty, setEditingProperty] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<{ email: string; password: string } | null>(null);
 
   const [formData, setFormData] = useState<Partial<Property>>({
     name: '',
@@ -202,6 +210,39 @@ export default function AdminPage() {
     return `mailto:${booking.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
+  const formatLogDate = (date: string) =>
+    new Intl.DateTimeFormat('fr-FR', {
+      dateStyle: 'short',
+      timeStyle: 'medium',
+    }).format(new Date(date));
+
+  const getResetMailLink = (email: string, password: string) => {
+    const subject = 'Réinitialisation de votre mot de passe E&K Immobilier';
+    const body = [
+      'Bonjour,',
+      '',
+      'Votre mot de passe E&K Immobilier a été réinitialisé.',
+      '',
+      `Nouveau mot de passe temporaire : ${password}`,
+      '',
+      'Vous pouvez maintenant vous reconnecter avec ce mot de passe.',
+      '',
+      'Cordialement,',
+      'E&K Immobilier',
+    ].join('\n');
+
+    return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const handleResetPassword = (userId: string) => {
+    const result = resetPassword(userId);
+
+    if (result.success && result.user && result.password) {
+      setResetResult({ email: result.user.email, password: result.password });
+      window.location.href = getResetMailLink(result.user.email, result.password);
+    }
+  };
+
   if (!authChecked || currentUser?.role !== 'admin') {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
@@ -220,7 +261,7 @@ export default function AdminPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -272,6 +313,23 @@ export default function AdminPage() {
               </div>
             </div>
           </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <Users size={24} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-gray-600 text-sm">Comptes</p>
+                <p className="text-3xl font-bold text-primary">{users.length}</p>
+              </div>
+            </div>
+          </motion.div>
         </div>
 
         {/* Tabs */}
@@ -295,6 +353,26 @@ export default function AdminPage() {
             }`}
           >
             Réservations
+          </button>
+          <button
+            onClick={() => setActiveTab('accounts')}
+            className={`px-6 py-3 font-bold transition-colors ${
+              activeTab === 'accounts'
+                ? 'text-secondary border-b-2 border-secondary'
+                : 'text-gray-600 hover:text-primary'
+            }`}
+          >
+            Comptes
+          </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`px-6 py-3 font-bold transition-colors ${
+              activeTab === 'logs'
+                ? 'text-secondary border-b-2 border-secondary'
+                : 'text-gray-600 hover:text-primary'
+            }`}
+          >
+            Logs
           </button>
         </div>
 
@@ -735,6 +813,121 @@ export default function AdminPage() {
                       >
                         <Trash2 size={20} />
                       </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Accounts Section */}
+        {activeTab === 'accounts' && (
+          <div className="space-y-4">
+            {resetResult && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <p className="font-bold text-primary">Mot de passe réinitialisé</p>
+                <p className="text-sm text-gray-700">
+                  Compte : {resetResult.email} | Nouveau mot de passe :{' '}
+                  <span className="font-mono font-bold">{resetResult.password}</span>
+                </p>
+                <a
+                  href={getResetMailLink(resetResult.email, resetResult.password)}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90"
+                >
+                  <Mail size={16} />
+                  Rouvrir le mail
+                </a>
+              </div>
+            )}
+
+            {users.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <Users size={48} className="mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-600 text-lg">Aucun compte stocké</p>
+              </div>
+            ) : (
+              users.map((user) => (
+                <motion.div
+                  key={user.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="bg-white p-6 rounded-lg shadow-md border border-gray-200"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-500">Nom</p>
+                        <p className="font-bold text-primary">{user.name || 'Sans nom'}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-500">Email</p>
+                        <p className="break-all text-gray-800">{user.email}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-500">Mot de passe</p>
+                        <p className="break-all font-mono text-sm font-bold text-gray-800">{user.password}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-500">Rôle</p>
+                        <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-sm font-bold text-gray-700">
+                          {user.role}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleResetPassword(user.id)}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90"
+                    >
+                      <KeyRound size={16} />
+                      Reset + mail
+                    </button>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Logs Section */}
+        {activeTab === 'logs' && (
+          <div>
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-primary">Logs</h2>
+                <p className="text-sm text-gray-600">Historique local des connexions, créations et resets.</p>
+              </div>
+              <button
+                onClick={clearLogs}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50"
+              >
+                Vider les logs
+              </button>
+            </div>
+
+            {logs.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <ClipboardList size={48} className="mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-600 text-lg">Aucun log pour le moment</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {logs.map((log) => (
+                  <motion.div
+                    key={log.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
+                  >
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="font-bold text-primary">{log.message}</p>
+                        <p className="break-all text-sm text-gray-600">{log.email}</p>
+                      </div>
+                      <div className="flex flex-col gap-1 text-left md:text-right">
+                        <span className="text-sm font-bold uppercase text-secondary">{log.type}</span>
+                        <span className="text-sm text-gray-500">{formatLogDate(log.createdAt)}</span>
+                      </div>
                     </div>
                   </motion.div>
                 ))}

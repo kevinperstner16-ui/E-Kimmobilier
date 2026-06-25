@@ -5,6 +5,14 @@ import { persist } from 'zustand/middleware';
 
 export type UserRole = 'admin' | 'user';
 
+export type AuthLog = {
+  id: string;
+  type: 'login' | 'register' | 'logout' | 'password_reset';
+  email: string;
+  message: string;
+  createdAt: string;
+};
+
 export type AuthUser = {
   id: string;
   name: string;
@@ -17,9 +25,17 @@ type PublicUser = Omit<AuthUser, 'password'>;
 
 interface AuthStore {
   users: AuthUser[];
+  logs: AuthLog[];
   currentUser: PublicUser | null;
   login: (email: string, password: string) => { success: boolean; message: string };
   register: (name: string, email: string, password: string) => { success: boolean; message: string };
+  resetPassword: (userId: string) => {
+    success: boolean;
+    message: string;
+    password?: string;
+    user?: AuthUser;
+  };
+  clearLogs: () => void;
   logout: () => void;
 }
 
@@ -42,10 +58,24 @@ const withoutPassword = (user: AuthUser): PublicUser => ({
   role: user.role,
 });
 
+const createLog = (type: AuthLog['type'], email: string, message: string): AuthLog => ({
+  id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  type,
+  email,
+  message,
+  createdAt: new Date().toISOString(),
+});
+
+const createTemporaryPassword = () =>
+  `EK-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString().slice(-4)}!`;
+
+const pushLog = (logs: AuthLog[], log: AuthLog) => [log, ...(logs ?? [])].slice(0, 200);
+
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
       users: [adminUser],
+      logs: [],
       currentUser: null,
       login: (email, password) => {
         const normalizedEmail = normalizeEmail(email);
@@ -55,10 +85,19 @@ export const useAuthStore = create<AuthStore>()(
         );
 
         if (!user) {
+          set((state) => ({
+            logs: pushLog(
+              state.logs,
+              createLog('login', normalizedEmail, 'Tentative de connexion refusée.')
+            ),
+          }));
           return { success: false, message: 'Email ou mot de passe incorrect.' };
         }
 
-        set({ currentUser: withoutPassword(user) });
+        set((state) => ({
+          currentUser: withoutPassword(user),
+          logs: pushLog(state.logs, createLog('login', user.email, 'Connexion réussie.')),
+        }));
         return { success: true, message: 'Connexion réussie.' };
       },
       register: (name, email, password) => {
@@ -78,10 +117,43 @@ export const useAuthStore = create<AuthStore>()(
         set((state) => ({
           users: [...state.users, user],
           currentUser: withoutPassword(user),
+          logs: pushLog(state.logs, createLog('register', user.email, `Compte créé pour ${user.name}.`)),
         }));
         return { success: true, message: 'Compte créé avec succès.' };
       },
-      logout: () => set({ currentUser: null }),
+      resetPassword: (userId) => {
+        const user = get().users.find((candidate) => candidate.id === userId);
+
+        if (!user) {
+          return { success: false, message: 'Compte introuvable.' };
+        }
+
+        const password = createTemporaryPassword();
+        const updatedUser = { ...user, password };
+
+        set((state) => ({
+          users: state.users.map((candidate) => (candidate.id === userId ? updatedUser : candidate)),
+          logs: pushLog(
+            state.logs,
+            createLog('password_reset', user.email, `Mot de passe réinitialisé pour ${user.name}.`)
+          ),
+        }));
+
+        return {
+          success: true,
+          message: 'Mot de passe réinitialisé.',
+          password,
+          user: updatedUser,
+        };
+      },
+      clearLogs: () => set({ logs: [] }),
+      logout: () => {
+        const user = get().currentUser;
+        set((state) => ({
+          currentUser: null,
+          logs: user ? pushLog(state.logs, createLog('logout', user.email, 'Déconnexion.')) : state.logs,
+        }));
+      },
     }),
     {
       name: 'ek-auth',
@@ -94,6 +166,7 @@ export const useAuthStore = create<AuthStore>()(
           ...currentState,
           ...persisted,
           users: hasAdmin ? users : [adminUser, ...users],
+          logs: persisted.logs ?? [],
         };
       },
     }
