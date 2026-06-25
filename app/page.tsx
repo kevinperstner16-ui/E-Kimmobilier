@@ -30,7 +30,7 @@ export default function Home() {
                 Trouvez votre <span className="text-secondary">Chez-vous</span>
               </h1>
               <p className="text-xl text-gray-200 mb-8 max-w-3xl mx-auto">
-                Découvrez nos appartements d'exception avec un service professionnel et une
+                Découvrez nos appartements d&apos;exception avec un service professionnel et une
                 disponibilité en temps réel. E&K Immobilier, votre partenaire de confiance.
               </p>
               <Link
@@ -95,7 +95,7 @@ export default function Home() {
         <section className="py-16 px-4 max-w-7xl mx-auto">
           <h2 className="text-4xl font-bold text-primary mb-4">Nos Propriétés</h2>
           <p className="text-gray-600 mb-12 text-lg">
-            Explorez notre sélection exclusive d'appartements disponibles
+            Explorez notre sélection exclusive d&apos;appartements disponibles
           </p>
           <PropertyList />
           <div className="mt-12 text-center">
@@ -113,7 +113,7 @@ export default function Home() {
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-4xl font-bold mb-4">Prêt à trouver votre prochain chez-vous ?</h2>
             <p className="text-lg mb-8 opacity-95">
-              Contactez-nous dès aujourd'hui pour plus d'informations ou pour visiter l'une de
+              Contactez-nous dès aujourd&apos;hui pour plus d&apos;informations ou pour visiter l&apos;une de
               nos propriétés.
             </p>
             <Link

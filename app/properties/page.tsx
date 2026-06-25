@@ -11,7 +11,7 @@ export default function PropertiesPage() {
           <div className="max-w-7xl mx-auto">
             <h1 className="text-4xl font-bold mb-4">Nos Propriétés</h1>
             <p className="text-gray-200 text-lg">
-              Découvrez l'intégralité de notre catalogue d'appartements disponibles
+              Découvrez l&apos;intégralité de notre catalogue d&apos;appartements disponibles
             </p>
           </div>
         </section>

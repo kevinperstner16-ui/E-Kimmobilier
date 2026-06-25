@@ -99,7 +99,7 @@ export default function PropertyCard({ property }: PropertyCardProps) {
             <span className="text-sm font-semibold text-gray-800">
               {property.bathrooms}
             </span>
-            <span className="text-xs text-gray-600">Salles d'eau</span>
+            <span className="text-xs text-gray-600">Salles d&apos;eau</span>
           </div>
           <div className="flex flex-col items-center p-2 bg-gray-50 rounded">
             <Maximize2 size={20} className="text-primary mb-1" />
