@@ -2,7 +2,7 @@
 
 import Footer from '@/components/Footer';
 import Header from '@/components/Header';
-import { ADMIN_EMAIL, useAuthStore } from '@/lib/auth-store';
+import { isPrimaryAdminEmail, useAuthStore } from '@/lib/auth-store';
 import { LockKeyhole, LogIn, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -27,7 +27,7 @@ export default function LoginPage() {
     const requestedPage = new URLSearchParams(window.location.search).get('redirect');
     const destination = requestedPage?.startsWith('/')
       ? requestedPage
-      : email.trim().toLowerCase() === ADMIN_EMAIL
+      : isPrimaryAdminEmail(email)
         ? '/admin'
         : '/';
     router.push(destination);

@@ -57,6 +57,15 @@ const adminUser: AuthUser = {
 export const PRIMARY_ADMIN_ID = adminUser.id;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const ADMIN_EMAIL_NORMALIZED = normalizeEmail(ADMIN_EMAIL);
+
+export const isPrimaryAdminEmail = (email: string) =>
+  normalizeEmail(email) === ADMIN_EMAIL_NORMALIZED;
+
+export const isPrimaryAdminAccount = (
+  user: Pick<AuthUser, 'id' | 'email'> | Pick<PublicUser, 'id' | 'email'> | null | undefined
+) => Boolean(user && (user.id === PRIMARY_ADMIN_ID || isPrimaryAdminEmail(user.email)));
+
 const withoutPassword = (user: AuthUser): PublicUser => ({
   id: user.id,
   name: user.name,
@@ -78,19 +87,49 @@ const saveLog = (log: AuthLog) => {
   void authDatabase.addLog(log).catch(console.error);
 };
 
+const normalizeStoredUser = (user: AuthUser): AuthUser => {
+  if (isPrimaryAdminAccount(user)) {
+    return adminUser;
+  }
+
+  return {
+    ...user,
+    email: normalizeEmail(user.email),
+    role: user.role === 'admin' ? 'admin' : 'user',
+  };
+};
+
 const mergeUsers = (localUsers: AuthUser[], remoteUsers: AuthUser[]) => {
   const byEmail = new Map<string, AuthUser>();
 
   [...localUsers, ...remoteUsers].forEach((user) => {
-    byEmail.set(normalizeEmail(user.email), user);
+    const normalizedUser = normalizeStoredUser(user);
+
+    if (isPrimaryAdminAccount(normalizedUser)) {
+      return;
+    }
+
+    byEmail.set(normalizeEmail(normalizedUser.email), normalizedUser);
   });
 
-  byEmail.set(ADMIN_EMAIL, {
-    ...(byEmail.get(ADMIN_EMAIL) ?? adminUser),
-    ...adminUser,
-  });
+  byEmail.delete(ADMIN_EMAIL_NORMALIZED);
 
-  return Array.from(byEmail.values());
+  return [adminUser, ...Array.from(byEmail.values())];
+};
+
+const reconcileCurrentUser = (currentUser: PublicUser | null, users: AuthUser[]) => {
+  if (!currentUser) return null;
+
+  if (isPrimaryAdminAccount(currentUser)) {
+    return withoutPassword(adminUser);
+  }
+
+  const currentEmail = normalizeEmail(currentUser.email);
+  const matchingUser = users.find(
+    (user) => user.id === currentUser.id || normalizeEmail(user.email) === currentEmail
+  );
+
+  return matchingUser ? withoutPassword(matchingUser) : null;
 };
 
 export const useAuthStore = create<AuthStore>()(
@@ -102,7 +141,12 @@ export const useAuthStore = create<AuthStore>()(
       isRemoteReady: false,
       loadFromDatabase: async () => {
         if (!authDatabase.isEnabled()) {
-          set({ isRemoteReady: true });
+          const mergedUsers = mergeUsers(get().users, []);
+          set({
+            users: mergedUsers,
+            currentUser: reconcileCurrentUser(get().currentUser, mergedUsers),
+            isRemoteReady: true,
+          });
           return;
         }
 
@@ -115,6 +159,7 @@ export const useAuthStore = create<AuthStore>()(
         set({
           users: mergedUsers,
           logs: remoteLogs ?? get().logs,
+          currentUser: reconcileCurrentUser(get().currentUser, mergedUsers),
           isRemoteReady: true,
         });
 
@@ -219,7 +264,7 @@ export const useAuthStore = create<AuthStore>()(
           return { success: false, message: 'Compte introuvable.' };
         }
 
-        if (user.id === PRIMARY_ADMIN_ID) {
+        if (isPrimaryAdminAccount(user)) {
           return { success: false, message: 'Le compte admin principal garde toujours toutes les permissions.' };
         }
 
@@ -259,13 +304,13 @@ export const useAuthStore = create<AuthStore>()(
       name: 'ek-auth',
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<AuthStore>;
-        const users = persisted.users ?? [];
-        const hasAdmin = users.some((user) => user.email === ADMIN_EMAIL);
+        const users = mergeUsers(persisted.users ?? [], []);
 
         return {
           ...currentState,
           ...persisted,
-          users: hasAdmin ? users : [adminUser, ...users],
+          users,
+          currentUser: reconcileCurrentUser(persisted.currentUser ?? null, users),
           logs: persisted.logs ?? [],
           isRemoteReady: false,
         };

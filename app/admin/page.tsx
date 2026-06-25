@@ -5,7 +5,7 @@ import Footer from '@/components/Footer';
 import { usePropertyStore } from '@/lib/store';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ADMIN_EMAIL, PRIMARY_ADMIN_ID, UserRole, useAuthStore } from '@/lib/auth-store';
+import { UserRole, isPrimaryAdminAccount, useAuthStore } from '@/lib/auth-store';
 import { motion } from 'framer-motion';
 import {
   Plus,
@@ -35,10 +35,11 @@ export default function AdminPage() {
   const currentUser = useAuthStore((state) => state.currentUser);
   const users = useAuthStore((state) => state.users);
   const logs = useAuthStore((state) => state.logs);
+  const isRemoteReady = useAuthStore((state) => state.isRemoteReady);
   const requestPasswordReset = useAuthStore((state) => state.requestPasswordReset);
   const setUserRole = useAuthStore((state) => state.setUserRole);
   const clearLogs = useAuthStore((state) => state.clearLogs);
-  const isPrimaryAdmin = currentUser?.email === ADMIN_EMAIL;
+  const isPrimaryAdmin = isPrimaryAdminAccount(currentUser);
   const [authChecked, setAuthChecked] = useState(false);
   const {
     properties,
@@ -72,11 +73,13 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
+    if (!isRemoteReady) return;
+
     setAuthChecked(true);
     if (!currentUser || currentUser.role !== 'admin') {
       router.replace('/login?redirect=/admin');
     }
-  }, [currentUser, router]);
+  }, [currentUser, isRemoteReady, router]);
 
   useEffect(() => {
     if (!isPrimaryAdmin && (activeTab === 'accounts' || activeTab === 'logs')) {
@@ -267,7 +270,7 @@ export default function AdminPage() {
     setUserRole(userId, role);
   };
 
-  if (!authChecked || currentUser?.role !== 'admin') {
+  if (!isRemoteReady || !authChecked || currentUser?.role !== 'admin') {
     return (
       <main className="flex min-h-screen items-center justify-center bg-gray-50">
         <p className="font-semibold text-primary">Vérification de l&apos;accès administrateur...</p>
@@ -899,7 +902,7 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-500">Rôle</p>
-                        {user.id === PRIMARY_ADMIN_ID ? (
+                        {isPrimaryAdminAccount(user) ? (
                           <span className="inline-block rounded-full bg-secondary px-3 py-1 text-sm font-bold text-white">
                             admin principal
                           </span>
@@ -916,7 +919,7 @@ export default function AdminPage() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
-                      {user.id === PRIMARY_ADMIN_ID && (
+                      {isPrimaryAdminAccount(user) && (
                         <span className="rounded-lg bg-green-50 px-3 py-2 text-center text-sm font-bold text-green-700">
                           Toutes permissions
                         </span>
