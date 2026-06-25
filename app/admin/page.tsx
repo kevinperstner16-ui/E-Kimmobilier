@@ -5,7 +5,7 @@ import Footer from '@/components/Footer';
 import { usePropertyStore } from '@/lib/store';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/lib/auth-store';
+import { ADMIN_EMAIL, PRIMARY_ADMIN_ID, UserRole, useAuthStore } from '@/lib/auth-store';
 import { motion } from 'framer-motion';
 import {
   Plus,
@@ -36,7 +36,9 @@ export default function AdminPage() {
   const users = useAuthStore((state) => state.users);
   const logs = useAuthStore((state) => state.logs);
   const resetPassword = useAuthStore((state) => state.resetPassword);
+  const setUserRole = useAuthStore((state) => state.setUserRole);
   const clearLogs = useAuthStore((state) => state.clearLogs);
+  const isPrimaryAdmin = currentUser?.email === ADMIN_EMAIL;
   const [authChecked, setAuthChecked] = useState(false);
   const {
     properties,
@@ -75,6 +77,12 @@ export default function AdminPage() {
       router.replace('/login?redirect=/admin');
     }
   }, [currentUser, router]);
+
+  useEffect(() => {
+    if (!isPrimaryAdmin && (activeTab === 'accounts' || activeTab === 'logs')) {
+      setActiveTab('properties');
+    }
+  }, [activeTab, isPrimaryAdmin]);
 
   const resetPropertyForm = () => {
     setFormData({
@@ -235,12 +243,20 @@ export default function AdminPage() {
   };
 
   const handleResetPassword = (userId: string) => {
+    if (!isPrimaryAdmin) return;
+
     const result = resetPassword(userId);
 
     if (result.success && result.user && result.password) {
       setResetResult({ email: result.user.email, password: result.password });
       window.location.href = getResetMailLink(result.user.email, result.password);
     }
+  };
+
+  const handleRoleChange = (userId: string, role: UserRole) => {
+    if (!isPrimaryAdmin) return;
+
+    setUserRole(userId, role);
   };
 
   if (!authChecked || currentUser?.role !== 'admin') {
@@ -314,22 +330,24 @@ export default function AdminPage() {
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <Users size={24} className="text-blue-600" />
+          {isPrimaryAdmin && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Users size={24} className="text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">Comptes</p>
+                  <p className="text-3xl font-bold text-primary">{users.length}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-gray-600 text-sm">Comptes</p>
-                <p className="text-3xl font-bold text-primary">{users.length}</p>
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -354,26 +372,30 @@ export default function AdminPage() {
           >
             Réservations
           </button>
-          <button
-            onClick={() => setActiveTab('accounts')}
-            className={`px-6 py-3 font-bold transition-colors ${
-              activeTab === 'accounts'
-                ? 'text-secondary border-b-2 border-secondary'
-                : 'text-gray-600 hover:text-primary'
-            }`}
-          >
-            Comptes
-          </button>
-          <button
-            onClick={() => setActiveTab('logs')}
-            className={`px-6 py-3 font-bold transition-colors ${
-              activeTab === 'logs'
-                ? 'text-secondary border-b-2 border-secondary'
-                : 'text-gray-600 hover:text-primary'
-            }`}
-          >
-            Logs
-          </button>
+          {isPrimaryAdmin && (
+            <>
+              <button
+                onClick={() => setActiveTab('accounts')}
+                className={`px-6 py-3 font-bold transition-colors ${
+                  activeTab === 'accounts'
+                    ? 'text-secondary border-b-2 border-secondary'
+                    : 'text-gray-600 hover:text-primary'
+                }`}
+              >
+                Comptes
+              </button>
+              <button
+                onClick={() => setActiveTab('logs')}
+                className={`px-6 py-3 font-bold transition-colors ${
+                  activeTab === 'logs'
+                    ? 'text-secondary border-b-2 border-secondary'
+                    : 'text-gray-600 hover:text-primary'
+                }`}
+              >
+                Logs
+              </button>
+            </>
+          )}
         </div>
 
         {/* Properties Section */}
@@ -822,7 +844,7 @@ export default function AdminPage() {
         )}
 
         {/* Accounts Section */}
-        {activeTab === 'accounts' && (
+        {activeTab === 'accounts' && isPrimaryAdmin && (
           <div className="space-y-4">
             {resetResult && (
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
@@ -870,18 +892,36 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-500">Rôle</p>
-                        <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-sm font-bold text-gray-700">
-                          {user.role}
-                        </span>
+                        {user.id === PRIMARY_ADMIN_ID ? (
+                          <span className="inline-block rounded-full bg-secondary px-3 py-1 text-sm font-bold text-white">
+                            admin principal
+                          </span>
+                        ) : (
+                          <select
+                            value={user.role}
+                            onChange={(event) => handleRoleChange(user.id, event.target.value as UserRole)}
+                            className="mt-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-secondary"
+                          >
+                            <option value="user">user</option>
+                            <option value="admin">admin</option>
+                          </select>
+                        )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleResetPassword(user.id)}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90"
-                    >
-                      <KeyRound size={16} />
-                      Reset + mail
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      {user.id === PRIMARY_ADMIN_ID && (
+                        <span className="rounded-lg bg-green-50 px-3 py-2 text-center text-sm font-bold text-green-700">
+                          Toutes permissions
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleResetPassword(user.id)}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90"
+                      >
+                        <KeyRound size={16} />
+                        Reset + mail
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               ))
@@ -890,7 +930,7 @@ export default function AdminPage() {
         )}
 
         {/* Logs Section */}
-        {activeTab === 'logs' && (
+        {activeTab === 'logs' && isPrimaryAdmin && (
           <div>
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>

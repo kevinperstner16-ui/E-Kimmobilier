@@ -7,7 +7,7 @@ export type UserRole = 'admin' | 'user';
 
 export type AuthLog = {
   id: string;
-  type: 'login' | 'register' | 'logout' | 'password_reset';
+  type: 'login' | 'register' | 'logout' | 'password_reset' | 'role_update';
   email: string;
   message: string;
   createdAt: string;
@@ -35,6 +35,7 @@ interface AuthStore {
     password?: string;
     user?: AuthUser;
   };
+  setUserRole: (userId: string, role: UserRole) => { success: boolean; message: string };
   clearLogs: () => void;
   logout: () => void;
 }
@@ -49,6 +50,8 @@ const adminUser: AuthUser = {
   password: ADMIN_PASSWORD,
   role: 'admin',
 };
+
+export const PRIMARY_ADMIN_ID = adminUser.id;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const withoutPassword = (user: AuthUser): PublicUser => ({
@@ -145,6 +148,29 @@ export const useAuthStore = create<AuthStore>()(
           password,
           user: updatedUser,
         };
+      },
+      setUserRole: (userId, role) => {
+        const user = get().users.find((candidate) => candidate.id === userId);
+
+        if (!user) {
+          return { success: false, message: 'Compte introuvable.' };
+        }
+
+        if (user.id === PRIMARY_ADMIN_ID) {
+          return { success: false, message: 'Le compte admin principal garde toujours toutes les permissions.' };
+        }
+
+        set((state) => ({
+          users: state.users.map((candidate) =>
+            candidate.id === userId ? { ...candidate, role } : candidate
+          ),
+          logs: pushLog(
+            state.logs,
+            createLog('role_update', user.email, `${user.name} est maintenant ${role}.`)
+          ),
+        }));
+
+        return { success: true, message: 'Rôle mis à jour.' };
       },
       clearLogs: () => set({ logs: [] }),
       logout: () => {
