@@ -34,6 +34,24 @@ create table if not exists public.bookings (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.auth_users (
+  id text primary key,
+  name text not null,
+  email text not null unique,
+  password text not null,
+  role text not null default 'user' check (role in ('admin', 'user')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.auth_logs (
+  id text primary key,
+  type text not null,
+  email text not null,
+  message text not null,
+  created_at timestamptz not null default now()
+);
+
 create or replace function public.set_updated_at()
 returns trigger as $$
 begin
@@ -52,8 +70,15 @@ create trigger bookings_set_updated_at
 before update on public.bookings
 for each row execute function public.set_updated_at();
 
+drop trigger if exists auth_users_set_updated_at on public.auth_users;
+create trigger auth_users_set_updated_at
+before update on public.auth_users
+for each row execute function public.set_updated_at();
+
 alter table public.properties enable row level security;
 alter table public.bookings enable row level security;
+alter table public.auth_users enable row level security;
+alter table public.auth_logs enable row level security;
 
 -- Version simple pour GitHub Pages :
 -- Les visiteurs peuvent lire les annonces, créer une demande, et lire leur statut.
@@ -93,6 +118,36 @@ drop policy if exists "public update bookings" on public.bookings;
 create policy "public update bookings"
 on public.bookings
 for update
+to anon
+using (true)
+with check (true);
+
+drop policy if exists "public read auth users" on public.auth_users;
+create policy "public read auth users"
+on public.auth_users
+for select
+to anon
+using (true);
+
+drop policy if exists "public write auth users" on public.auth_users;
+create policy "public write auth users"
+on public.auth_users
+for all
+to anon
+using (true)
+with check (true);
+
+drop policy if exists "public read auth logs" on public.auth_logs;
+create policy "public read auth logs"
+on public.auth_logs
+for select
+to anon
+using (true);
+
+drop policy if exists "public write auth logs" on public.auth_logs;
+create policy "public write auth logs"
+on public.auth_logs
+for all
 to anon
 using (true)
 with check (true);

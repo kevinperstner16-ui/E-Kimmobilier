@@ -1,5 +1,6 @@
 'use client';
 
+import { authDatabase } from '@/backend/supabase/auth-repository';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -27,6 +28,8 @@ interface AuthStore {
   users: AuthUser[];
   logs: AuthLog[];
   currentUser: PublicUser | null;
+  isRemoteReady: boolean;
+  loadFromDatabase: () => Promise<void>;
   login: (email: string, password: string) => { success: boolean; message: string };
   register: (name: string, email: string, password: string) => { success: boolean; message: string };
   requestPasswordReset: (userId: string) => {
@@ -71,12 +74,54 @@ const createLog = (type: AuthLog['type'], email: string, message: string): AuthL
 
 const pushLog = (logs: AuthLog[], log: AuthLog) => [log, ...(logs ?? [])].slice(0, 200);
 
+const saveLog = (log: AuthLog) => {
+  void authDatabase.addLog(log).catch(console.error);
+};
+
+const mergeUsers = (localUsers: AuthUser[], remoteUsers: AuthUser[]) => {
+  const byEmail = new Map<string, AuthUser>();
+
+  [...localUsers, ...remoteUsers].forEach((user) => {
+    byEmail.set(normalizeEmail(user.email), user);
+  });
+
+  byEmail.set(ADMIN_EMAIL, {
+    ...(byEmail.get(ADMIN_EMAIL) ?? adminUser),
+    ...adminUser,
+  });
+
+  return Array.from(byEmail.values());
+};
+
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
       users: [adminUser],
       logs: [],
       currentUser: null,
+      isRemoteReady: false,
+      loadFromDatabase: async () => {
+        if (!authDatabase.isEnabled()) {
+          set({ isRemoteReady: true });
+          return;
+        }
+
+        const [remoteUsers, remoteLogs] = await Promise.all([
+          authDatabase.getUsers(),
+          authDatabase.getLogs(),
+        ]);
+
+        const mergedUsers = mergeUsers(get().users, remoteUsers ?? []);
+        set({
+          users: mergedUsers,
+          logs: remoteLogs ?? get().logs,
+          isRemoteReady: true,
+        });
+
+        await Promise.all(
+          mergedUsers.map((user) => authDatabase.upsertUser(user).catch(console.error))
+        );
+      },
       login: (email, password) => {
         const normalizedEmail = normalizeEmail(email);
         const user = get().users.find(
@@ -85,19 +130,18 @@ export const useAuthStore = create<AuthStore>()(
         );
 
         if (!user) {
-          set((state) => ({
-            logs: pushLog(
-              state.logs,
-              createLog('login', normalizedEmail, 'Tentative de connexion refusée.')
-            ),
-          }));
+          const log = createLog('login', normalizedEmail, 'Tentative de connexion refusée.');
+          set((state) => ({ logs: pushLog(state.logs, log) }));
+          saveLog(log);
           return { success: false, message: 'Email ou mot de passe incorrect.' };
         }
 
+        const log = createLog('login', user.email, 'Connexion réussie.');
         set((state) => ({
           currentUser: withoutPassword(user),
-          logs: pushLog(state.logs, createLog('login', user.email, 'Connexion réussie.')),
+          logs: pushLog(state.logs, log),
         }));
+        saveLog(log);
         return { success: true, message: 'Connexion réussie.' };
       },
       register: (name, email, password) => {
@@ -113,12 +157,16 @@ export const useAuthStore = create<AuthStore>()(
           password,
           role: 'user',
         };
+        const log = createLog('register', user.email, `Compte créé pour ${user.name}.`);
 
         set((state) => ({
           users: [...state.users, user],
           currentUser: withoutPassword(user),
-          logs: pushLog(state.logs, createLog('register', user.email, `Compte créé pour ${user.name}.`)),
+          logs: pushLog(state.logs, log),
         }));
+
+        void authDatabase.upsertUser(user).catch(console.error);
+        saveLog(log);
         return { success: true, message: 'Compte créé avec succès.' };
       },
       requestPasswordReset: (userId) => {
@@ -128,12 +176,9 @@ export const useAuthStore = create<AuthStore>()(
           return { success: false, message: 'Compte introuvable.' };
         }
 
-        set((state) => ({
-          logs: pushLog(
-            state.logs,
-            createLog('password_reset_request', user.email, `Lien de reset préparé pour ${user.name}.`)
-          ),
-        }));
+        const log = createLog('password_reset_request', user.email, `Lien de reset préparé pour ${user.name}.`);
+        set((state) => ({ logs: pushLog(state.logs, log) }));
+        saveLog(log);
 
         return {
           success: true,
@@ -149,20 +194,22 @@ export const useAuthStore = create<AuthStore>()(
           return { success: false, message: 'Compte introuvable.' };
         }
 
+        const updatedUser = { ...user, password };
+        const log = createLog('password_reset', user.email, `Mot de passe modifié par ${user.name}.`);
+
         set((state) => ({
           users: state.users.map((candidate) =>
-            normalizeEmail(candidate.email) === normalizedEmail ? { ...candidate, password } : candidate
+            normalizeEmail(candidate.email) === normalizedEmail ? updatedUser : candidate
           ),
           currentUser:
             state.currentUser && normalizeEmail(state.currentUser.email) === normalizedEmail
-              ? withoutPassword({ ...user, password })
+              ? withoutPassword(updatedUser)
               : state.currentUser,
-          logs: pushLog(
-            state.logs,
-            createLog('password_reset', user.email, `Mot de passe modifié par ${user.name}.`)
-          ),
+          logs: pushLog(state.logs, log),
         }));
 
+        void authDatabase.upsertUser(updatedUser).catch(console.error);
+        saveLog(log);
         return { success: true, message: 'Mot de passe modifié avec succès.' };
       },
       setUserRole: (userId, role) => {
@@ -176,27 +223,36 @@ export const useAuthStore = create<AuthStore>()(
           return { success: false, message: 'Le compte admin principal garde toujours toutes les permissions.' };
         }
 
+        const updatedUser = { ...user, role };
+        const log = createLog('role_update', user.email, `${user.name} est maintenant ${role}.`);
+
         set((state) => ({
           users: state.users.map((candidate) =>
-            candidate.id === userId ? { ...candidate, role } : candidate
+            candidate.id === userId ? updatedUser : candidate
           ),
           currentUser:
             state.currentUser?.id === userId ? { ...state.currentUser, role } : state.currentUser,
-          logs: pushLog(
-            state.logs,
-            createLog('role_update', user.email, `${user.name} est maintenant ${role}.`)
-          ),
+          logs: pushLog(state.logs, log),
         }));
 
+        void authDatabase.upsertUser(updatedUser).catch(console.error);
+        saveLog(log);
         return { success: true, message: 'Rôle mis à jour.' };
       },
-      clearLogs: () => set({ logs: [] }),
+      clearLogs: () => {
+        set({ logs: [] });
+        void authDatabase.clearLogs().catch(console.error);
+      },
       logout: () => {
         const user = get().currentUser;
+        const log = user ? createLog('logout', user.email, 'Déconnexion.') : null;
+
         set((state) => ({
           currentUser: null,
-          logs: user ? pushLog(state.logs, createLog('logout', user.email, 'Déconnexion.')) : state.logs,
+          logs: log ? pushLog(state.logs, log) : state.logs,
         }));
+
+        if (log) saveLog(log);
       },
     }),
     {
@@ -211,6 +267,7 @@ export const useAuthStore = create<AuthStore>()(
           ...persisted,
           users: hasAdmin ? users : [adminUser, ...users],
           logs: persisted.logs ?? [],
+          isRemoteReady: false,
         };
       },
     }
