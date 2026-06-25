@@ -17,7 +17,7 @@ const quickQuestions = [
   'Quels biens sont disponibles ?',
   'Comment faire une demande de visite ?',
   'Comment suivre ma demande ?',
-  'J ai un probleme de compte',
+  'J ai un problème de compte',
 ];
 
 const normalize = (value: string) =>
@@ -39,7 +39,7 @@ export default function AiHelpWidget() {
     {
       id: 'welcome',
       role: 'assistant',
-      text: "Bonjour, je suis l'assistant E&K. Je peux aider sur les biens, les demandes de visite, le suivi, les comptes et l'espace admin.",
+      text: "Bonjour, je suis E&K assistance. Je peux aider sur les biens, les demandes de visite, le suivi, les comptes et l'espace admin.",
     },
   ]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,7 +51,7 @@ export default function AiHelpWidget() {
 
   const createPropertySummary = () => {
     if (!properties.length) {
-      return "Je ne trouve aucune annonce chargee pour le moment. Essaie la page Proprietes ou contacte l'equipe E&K.";
+      return "Je ne trouve aucune annonce chargée pour le moment. Essaie la page Propriétés ou contacte l'équipe E&K.";
     }
 
     const lines = properties.slice(0, 5).map((property) => {
@@ -62,7 +62,7 @@ export default function AiHelpWidget() {
     return [
       `Il y a ${properties.length} bien(s) sur le site, dont ${availableProperties.length} disponible(s).`,
       ...lines,
-      'Pour voir les photos et envoyer une demande, va dans Proprietes.',
+      'Pour voir les photos et envoyer une demande, va dans Propriétés.',
     ].join('\n');
   };
 
@@ -90,9 +90,9 @@ export default function AiHelpWidget() {
         `Prix : ${matchedProperty.price}€/mois. Surface : ${matchedProperty.area}m2. Chambres : ${matchedProperty.bedrooms}.`,
         `Statut : ${getAvailabilityLabel(matchedProperty)}.`,
         matchedProperty.availableFrom
-          ? `Date indiquee : ${formatFrenchDate(matchedProperty.availableFrom)}.`
+          ? `Date indiquée : ${formatFrenchDate(matchedProperty.availableFrom)}.`
           : '',
-        'Tu peux ouvrir la page du bien depuis Proprietes pour voir les photos et demander une visite.',
+        'Tu peux ouvrir la page du bien depuis Propriétés pour voir les photos et demander une visite.',
       ]
         .filter(Boolean)
         .join('\n');
@@ -105,7 +105,7 @@ export default function AiHelpWidget() {
     if (/(visite|reservation|demande|rendez|rdv|book)/.test(q)) {
       return [
         "Pour faire une demande de visite :",
-        '1. Ouvre la page Proprietes.',
+        '1. Ouvre la page Propriétés.',
         '2. Choisis le bien qui t interesse.',
         '3. Remplis le formulaire de demande.',
         '4. Garde la reference pour suivre le statut dans Suivi demande.',
@@ -121,26 +121,26 @@ export default function AiHelpWidget() {
     }
 
     if (/(compte|connexion|login|inscription|mot de passe|mdp|reset|password)/.test(q)) {
-      return "Pour un probleme de compte, essaie d'abord Connexion ou Inscription. Si tu as oublie ton mot de passe, demande a l'equipe E&K de t'envoyer un lien de reset.";
+      return "Pour un problème de compte, essaie d'abord Connexion ou Inscription. Si tu as oublié ton mot de passe, demande a l'équipe E&K de t'envoyer un lien de reset.";
     }
 
     if (/(admin|administration|dashboard|tableau)/.test(q)) {
       if (currentUser?.role === 'admin') {
-        return "Tu es connecte en admin. Tu peux ouvrir le tableau admin pour gerer les annonces, reservations, comptes et logs selon tes permissions.";
+        return "Tu es connecté en admin. Tu peux ouvrir le tableau admin pour gérer les annonces, reservations, comptes et logs selon tes permissions.";
       }
 
-      return "L'espace admin est reserve aux comptes autorises. Connecte-toi avec un compte admin pour y acceder.";
+      return "L'espace admin est reserve aux comptes autorisés. Connecte-toi avec un compte admin pour y acceder.";
     }
 
     if (/(bonjour|salut|hello|cc|coucou)/.test(q)) {
-      return "Bonjour ! Tu peux me demander les biens disponibles, comment reserver une visite, suivre une demande ou regler un souci de compte.";
+      return "Bonjour ! Tu peux me demander les biens disponibles, comment réserver une visite, suivre une demande ou régler un souci de compte.";
     }
 
     if (bookings.length && /(combien|nombre|reservations|demandes)/.test(q)) {
-      return `Il y a ${bookings.length} demande(s) de visite enregistree(s) dans ce navigateur. Pour les gerer, ouvre le panneau admin avec un compte autorise.`;
+      return `Il y a ${bookings.length} demande(s) de visite enregistrée(s) dans ce navigateur. Pour les gérer, ouvre le panneau admin avec un compte autorise.`;
     }
 
-    return "Je peux aider sur les annonces, les disponibilites, les prix, les visites, le suivi de demande, les comptes et l'admin. Reformule ta question avec le nom du bien ou le sujet.";
+    return "Je peux aider sur les annonces, les disponibilités, les prix, les visites, le suivi de demande, les comptes et l'admin. Reformule ta question avec le nom du bien ou le sujet.";
   };
 
   const sendMessage = (value = input) => {
@@ -169,14 +169,14 @@ export default function AiHelpWidget() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-[70]">
+    <div className="fixed bottom-4 left-4 z-[70]">
       {isOpen && (
         <div className="mb-3 flex h-[min(620px,calc(100vh-7rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl">
           <div className="flex items-center justify-between bg-primary px-4 py-3 text-white">
             <div className="flex items-center gap-2">
               <Bot size={20} />
               <div>
-                <p className="text-sm font-bold leading-tight">Assistant E&K</p>
+                <p className="text-sm font-bold leading-tight">E&K assistance</p>
                 <p className="text-xs text-white/80">Aide site et annonces</p>
               </div>
             </div>
@@ -184,7 +184,7 @@ export default function AiHelpWidget() {
               type="button"
               onClick={() => setIsOpen(false)}
               className="rounded p-1 hover:bg-white/10"
-              aria-label="Fermer l'assistant"
+              aria-label="Fermer E&K assistance"
             >
               <X size={20} />
             </button>
@@ -240,7 +240,7 @@ export default function AiHelpWidget() {
                 onClick={() => setIsOpen(false)}
               >
                 <Home size={14} />
-                Proprietes
+                Propriétés
               </Link>
               <Link
                 href="/contact"
@@ -281,10 +281,11 @@ export default function AiHelpWidget() {
       <button
         type="button"
         onClick={() => setIsOpen((value) => !value)}
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-white shadow-xl transition-transform hover:scale-105"
-        aria-label="Ouvrir l'assistant E&K"
+        className="flex h-14 items-center gap-2 rounded-full bg-secondary px-5 text-sm font-bold text-white shadow-xl transition-transform hover:scale-105"
+        aria-label="Ouvrir E&K assistance"
       >
-        {isOpen ? <X size={24} /> : <MessageCircle size={26} />}
+        {isOpen ? <X size={22} /> : <MessageCircle size={22} />}
+        <span>E&K assistance</span>
       </button>
     </div>
   );
