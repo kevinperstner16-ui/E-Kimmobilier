@@ -388,7 +388,7 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
               .map((relatedProperty) => (
                 <Link
                   key={relatedProperty.id}
-                  href={`/property/${relatedProperty.id}`}
+                  href={`/property?id=${encodeURIComponent(relatedProperty.id)}`}
                   className="group"
                 >
                   <motion.div

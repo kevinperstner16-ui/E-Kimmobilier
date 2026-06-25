@@ -145,7 +145,7 @@ export default function PropertyCard({ property }: PropertyCardProps) {
 
         {/* Action Button */}
         <Link
-          href={`/property/${property.id}`}
+          href={`/property?id=${encodeURIComponent(property.id)}`}
           className="w-full bg-secondary hover:bg-opacity-90 text-white font-bold py-2 px-4 rounded-lg transition-all duration-300 block text-center"
         >
           Voir les détails
