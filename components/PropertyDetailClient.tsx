@@ -23,6 +23,7 @@ import { getSelectedFeatureOptions } from '@/lib/property-options';
 import { getAvailabilityLabel } from '@/lib/availability';
 import { FALLBACK_PROPERTY_IMAGE, getPropertyImage } from '@/lib/images';
 import { formatBookingReference } from '@/lib/bookings';
+import { sendBookingNotification } from '@/lib/booking-notifications';
 
 interface PropertyDetailClientProps {
   id: string;
@@ -84,8 +85,7 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const bookingId = Date.now().toString();
-
-    addBooking({
+    const booking = {
       id: bookingId,
       propertyId: property.id,
       name: formData.name,
@@ -94,9 +94,12 @@ export default function PropertyDetailClient({ id }: PropertyDetailClientProps) 
       checkInDate: formData.visitDate || new Date().toISOString().slice(0, 10),
       checkOutDate: formData.visitDate || new Date().toISOString().slice(0, 10),
       message: formData.message || `Demande de visite pour ${property.name}`,
-      status: 'pending',
+      status: 'pending' as const,
       createdAt: new Date().toISOString(),
-    });
+    };
+
+    addBooking(booking);
+    void sendBookingNotification(booking, property).catch(console.error);
 
     alert(`Merci ! Votre demande est bien prise en charge.\nRéférence : ${formatBookingReference(bookingId)}`);
     setFormData({ name: '', email: '', phone: '', visitDate: '', message: '' });

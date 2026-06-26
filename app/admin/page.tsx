@@ -25,6 +25,7 @@ import {
   Bell,
   Eye,
   EyeOff,
+  Archive,
 } from 'lucide-react';
 import { Booking, Property } from '@/lib/types';
 import { FALLBACK_PROPERTY_IMAGE } from '@/lib/images';
@@ -68,6 +69,7 @@ export default function AdminPage() {
   const [bookingPropertyFilter, setBookingPropertyFilter] = useState('all');
   const [bookingSearch, setBookingSearch] = useState('');
   const [isRefreshingBookings, setIsRefreshingBookings] = useState(false);
+  const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const knownBookingIds = useRef<Set<string> | null>(null);
 
@@ -139,6 +141,8 @@ export default function AdminPage() {
   }, [bookingPropertyFilter, bookingSearch, bookingStatusFilter, properties, sortedBookings]);
 
   const pendingBookingsCount = bookings.filter((booking) => booking.status === 'pending').length;
+  const confirmedBookingsCount = bookings.filter((booking) => booking.status === 'confirmed').length;
+  const cancelledBookingsCount = bookings.filter((booking) => booking.status === 'cancelled').length;
 
   const isNewBooking = (booking: Booking) =>
     Date.now() - new Date(booking.createdAt).getTime() < 24 * 60 * 60 * 1000;
@@ -175,6 +179,22 @@ export default function AdminPage() {
       });
     }
   }, [bookings, currentUser]);
+
+  useEffect(() => {
+    if (currentUser?.role !== 'admin' || typeof window === 'undefined') return;
+
+    const backupDate = new Date().toISOString();
+    const backup = {
+      createdAt: backupDate,
+      properties,
+      bookings,
+      users,
+      logs,
+    };
+
+    window.localStorage.setItem('ek-admin-last-backup', JSON.stringify(backup));
+    setLastBackupAt(backupDate);
+  }, [bookings, currentUser, logs, properties, users]);
 
   const resetPropertyForm = () => {
     setFormData({
@@ -372,6 +392,33 @@ export default function AdminPage() {
     link.download = `reservations-ek-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const downloadFile = (content: string, filename: string, type: string) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportFullBackup = () => {
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      properties,
+      bookings: sortedBookings,
+      users,
+      logs,
+    };
+
+    downloadFile(
+      JSON.stringify(backup, null, 2),
+      `sauvegarde-ek-${new Date().toISOString().slice(0, 10)}.json`,
+      'application/json;charset=utf-8'
+    );
   };
 
   const formatLogDate = (date: string) =>
@@ -935,6 +982,15 @@ export default function AdminPage() {
                   <p className="text-sm text-gray-600">
                     {pendingBookingsCount} en attente - {filteredBookings.length} affichée(s)
                   </p>
+                  {lastBackupAt && (
+                    <p className="text-xs text-gray-500">
+                      Dernière sauvegarde locale :{' '}
+                      {new Intl.DateTimeFormat('fr-FR', {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      }).format(new Date(lastBackupAt))}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <button
@@ -953,7 +1009,61 @@ export default function AdminPage() {
                     <Download size={16} />
                     Export CSV
                   </button>
+                  <button
+                    onClick={exportFullBackup}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-primary px-4 py-2 text-sm font-bold text-primary hover:bg-gray-50"
+                  >
+                    <Archive size={16} />
+                    Sauvegarde JSON
+                  </button>
                 </div>
+              </div>
+
+              <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+                <button
+                  onClick={() => setBookingStatusFilter('all')}
+                  className={`rounded-lg border p-3 text-left ${
+                    bookingStatusFilter === 'all'
+                      ? 'border-primary bg-primary text-white'
+                      : 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  <p className="text-xs font-bold uppercase opacity-80">Total</p>
+                  <p className="text-2xl font-bold">{bookings.length}</p>
+                </button>
+                <button
+                  onClick={() => setBookingStatusFilter('pending')}
+                  className={`rounded-lg border p-3 text-left ${
+                    bookingStatusFilter === 'pending'
+                      ? 'border-yellow-500 bg-yellow-100 text-yellow-900'
+                      : 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  <p className="text-xs font-bold uppercase opacity-80">En attente</p>
+                  <p className="text-2xl font-bold">{pendingBookingsCount}</p>
+                </button>
+                <button
+                  onClick={() => setBookingStatusFilter('confirmed')}
+                  className={`rounded-lg border p-3 text-left ${
+                    bookingStatusFilter === 'confirmed'
+                      ? 'border-green-500 bg-green-100 text-green-900'
+                      : 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  <p className="text-xs font-bold uppercase opacity-80">Confirmées</p>
+                  <p className="text-2xl font-bold">{confirmedBookingsCount}</p>
+                </button>
+                <button
+                  onClick={() => setBookingStatusFilter('cancelled')}
+                  className={`rounded-lg border p-3 text-left ${
+                    bookingStatusFilter === 'cancelled'
+                      ? 'border-red-500 bg-red-100 text-red-900'
+                      : 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  <p className="text-xs font-bold uppercase opacity-80">Annulées</p>
+                  <p className="text-2xl font-bold">{cancelledBookingsCount}</p>
+                </button>
               </div>
 
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
