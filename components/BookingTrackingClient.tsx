@@ -17,9 +17,12 @@ export default function BookingTrackingClient() {
   const searchParams = useSearchParams();
   const bookings = usePropertyStore((state) => state.bookings);
   const properties = usePropertyStore((state) => state.properties);
+  const isRemoteEnabled = usePropertyStore((state) => state.isRemoteEnabled);
   const [email, setEmail] = useState(searchParams.get('email') || '');
   const [reference, setReference] = useState(searchParams.get('ref') || '');
-  const [hasSearched, setHasSearched] = useState(Boolean(searchParams.get('email') || searchParams.get('ref')));
+  const [hasSearched, setHasSearched] = useState(
+    Boolean(searchParams.get('email') || searchParams.get('ref'))
+  );
 
   const filteredBookings = useMemo(() => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -45,7 +48,7 @@ export default function BookingTrackingClient() {
         <div className="mb-8">
           <h1 className="mb-2 text-4xl font-bold text-primary">Suivi de demande</h1>
           <p className="text-gray-600">
-            Entrez votre email ou votre référence pour voir l’évolution de votre demande.
+            Entrez votre email ou votre référence pour voir l&apos;évolution de votre demande.
           </p>
         </div>
 
@@ -84,7 +87,7 @@ export default function BookingTrackingClient() {
 
         {hasSearched && filteredBookings.length === 0 && (
           <div className="rounded-lg bg-gray-50 p-8 text-center text-gray-600">
-            Aucune demande trouvée sur cet appareil avec ces informations.
+            Aucune demande trouvée avec ces informations.
           </div>
         )}
 
@@ -123,10 +126,11 @@ export default function BookingTrackingClient() {
             })}
         </div>
 
-        <p className="mt-8 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
-          Note : sur cette version GitHub Pages, le suivi est local à l’appareil/navigateur utilisé.
-          Pour un suivi partagé partout, il faudra connecter une vraie base de données.
-        </p>
+        {!isRemoteEnabled && (
+          <p className="mt-8 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
+            Note : la base partagée n&apos;est pas configurée. Le suivi reste local à ce navigateur tant que Supabase n&apos;est pas connecté.
+          </p>
+        )}
       </main>
       <Footer />
     </>

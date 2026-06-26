@@ -9,10 +9,17 @@ export default function DatabaseSync() {
   const loadAuthFromDatabase = useAuthStore((state) => state.loadFromDatabase);
 
   useEffect(() => {
-    void Promise.all([
-      loadPropertiesFromDatabase(),
-      loadAuthFromDatabase(),
-    ]).catch(console.error);
+    const sync = () => {
+      void Promise.all([
+        loadPropertiesFromDatabase(),
+        loadAuthFromDatabase(),
+      ]).catch(console.error);
+    };
+
+    sync();
+    const intervalId = window.setInterval(sync, 15000);
+
+    return () => window.clearInterval(intervalId);
   }, [loadPropertiesFromDatabase, loadAuthFromDatabase]);
 
   return null;

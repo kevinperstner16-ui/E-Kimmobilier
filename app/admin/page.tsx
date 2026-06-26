@@ -945,7 +945,7 @@ export default function AdminPage() {
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-primary">Logs</h2>
-                <p className="text-sm text-gray-600">Historique local des connexions, créations et resets.</p>
+                <p className="text-sm text-gray-600">Historique des connexions, créations et resets.</p>
               </div>
               <button
                 onClick={clearLogs}

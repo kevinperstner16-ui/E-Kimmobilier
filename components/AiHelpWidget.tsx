@@ -137,7 +137,7 @@ export default function AiHelpWidget() {
     }
 
     if (bookings.length && /(combien|nombre|reservations|demandes)/.test(q)) {
-      return `Il y a ${bookings.length} demande(s) de visite enregistrée(s) dans ce navigateur. Pour les gérer, ouvre le panneau admin avec un compte autorise.`;
+      return `Il y a ${bookings.length} demande(s) de visite enregistrée(s). Pour les gérer, ouvre le panneau admin avec un compte admin.`;
     }
 
     return "Je peux aider sur les annonces, les disponibilités, les prix, les visites, le suivi de demande, les comptes et l'admin. Reformule ta question avec le nom du bien ou le sujet.";
