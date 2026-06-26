@@ -3,9 +3,9 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { usePropertyStore } from '@/lib/store';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserRole, isPrimaryAdminAccount, useAuthStore } from '@/lib/auth-store';
+import { ADMIN_EMAIL, UserRole, isPrimaryAdminAccount, useAuthStore } from '@/lib/auth-store';
 import { motion } from 'framer-motion';
 import {
   Plus,
@@ -19,6 +19,12 @@ import {
   KeyRound,
   Mail,
   ClipboardList,
+  RefreshCcw,
+  Download,
+  Search,
+  Bell,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { Booking, Property } from '@/lib/types';
 import { FALLBACK_PROPERTY_IMAGE } from '@/lib/images';
@@ -49,13 +55,21 @@ export default function AdminPage() {
     deleteProperty,
     updateBooking,
     deleteBooking,
+    loadFromDatabase,
   } = usePropertyStore();
 
   const [activeTab, setActiveTab] = useState<'properties' | 'bookings' | 'accounts' | 'logs'>('properties');
   const [expandedProperty, setExpandedProperty] = useState<string | null>(null);
+  const [expandedBooking, setExpandedBooking] = useState<string | null>(null);
   const [showAddPropertyForm, setShowAddPropertyForm] = useState(false);
   const [editingProperty, setEditingProperty] = useState<string | null>(null);
   const [resetResult, setResetResult] = useState<{ email: string; link: string } | null>(null);
+  const [bookingStatusFilter, setBookingStatusFilter] = useState<'all' | Booking['status']>('all');
+  const [bookingPropertyFilter, setBookingPropertyFilter] = useState('all');
+  const [bookingSearch, setBookingSearch] = useState('');
+  const [isRefreshingBookings, setIsRefreshingBookings] = useState(false);
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+  const knownBookingIds = useRef<Set<string> | null>(null);
 
   const [formData, setFormData] = useState<Partial<Property>>({
     name: '',
@@ -86,6 +100,81 @@ export default function AdminPage() {
       setActiveTab('properties');
     }
   }, [activeTab, isPrimaryAdmin]);
+
+  const sortedBookings = useMemo(
+    () =>
+      [...bookings].sort(
+        (first, second) =>
+          new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
+      ),
+    [bookings]
+  );
+
+  const filteredBookings = useMemo(() => {
+    const query = bookingSearch.trim().toLowerCase();
+
+    return sortedBookings.filter((booking) => {
+      const property = properties.find((item) => item.id === booking.propertyId);
+      const matchesStatus =
+        bookingStatusFilter === 'all' || booking.status === bookingStatusFilter;
+      const matchesProperty =
+        bookingPropertyFilter === 'all' || booking.propertyId === bookingPropertyFilter;
+      const matchesSearch =
+        !query ||
+        [
+          booking.name,
+          booking.email,
+          booking.phone,
+          booking.message,
+          booking.id,
+          formatBookingReference(booking.id),
+          property?.name || '',
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(query);
+
+      return matchesStatus && matchesProperty && matchesSearch;
+    });
+  }, [bookingPropertyFilter, bookingSearch, bookingStatusFilter, properties, sortedBookings]);
+
+  const pendingBookingsCount = bookings.filter((booking) => booking.status === 'pending').length;
+
+  const isNewBooking = (booking: Booking) =>
+    Date.now() - new Date(booking.createdAt).getTime() < 24 * 60 * 60 * 1000;
+
+  useEffect(() => {
+    if (currentUser?.role !== 'admin') return;
+
+    const currentIds = new Set(bookings.map((booking) => booking.id));
+
+    if (!knownBookingIds.current) {
+      knownBookingIds.current = currentIds;
+      return;
+    }
+
+    const newBookings = bookings.filter((booking) => !knownBookingIds.current?.has(booking.id));
+    knownBookingIds.current = currentIds;
+
+    if (!newBookings.length || typeof window === 'undefined' || !('Notification' in window)) {
+      return;
+    }
+
+    const latestBooking = newBookings[0];
+    const showNotification = () => {
+      new Notification('Nouvelle réservation E&K', {
+        body: `${latestBooking.name} - ${formatBookingReference(latestBooking.id)}`,
+      });
+    };
+
+    if (Notification.permission === 'granted') {
+      showNotification();
+    } else if (Notification.permission === 'default') {
+      void Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') showNotification();
+      });
+    }
+  }, [bookings, currentUser]);
 
   const resetPropertyForm = () => {
     setFormData({
@@ -219,6 +308,70 @@ export default function AdminPage() {
     ].join('\n');
 
     return `mailto:${booking.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const getAdminNotificationMailLink = (booking: Booking) => {
+    const property = properties.find((item) => item.id === booking.propertyId);
+    const subject = `Nouvelle réservation - ${formatBookingReference(booking.id)}`;
+    const body = [
+      'Nouvelle demande de visite',
+      '',
+      `Référence : ${formatBookingReference(booking.id)}`,
+      `Bien : ${property?.name || `Annonce #${booking.propertyId}`}`,
+      `Client : ${booking.name}`,
+      `Email : ${booking.email}`,
+      `Téléphone : ${booking.phone || 'Non renseigné'}`,
+      `Date souhaitée : ${formatFrenchDate(booking.checkInDate)}`,
+      `Statut : ${getBookingStatusLabel(booking.status)}`,
+      '',
+      booking.message ? `Message : ${booking.message}` : 'Message : Aucun message',
+    ].join('\n');
+
+    return `mailto:${ADMIN_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+
+  const refreshBookings = async () => {
+    setIsRefreshingBookings(true);
+    try {
+      await loadFromDatabase();
+    } finally {
+      setIsRefreshingBookings(false);
+    }
+  };
+
+  const escapeCsvValue = (value: string | number | undefined) =>
+    `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+  const exportBookingsCsv = () => {
+    const rows = filteredBookings.map((booking) => {
+      const property = properties.find((item) => item.id === booking.propertyId);
+
+      return [
+        formatBookingReference(booking.id),
+        getBookingStatusLabel(booking.status),
+        property?.name || `Annonce #${booking.propertyId}`,
+        booking.name,
+        booking.email,
+        booking.phone,
+        booking.checkInDate,
+        booking.createdAt,
+        booking.message,
+      ];
+    });
+    const csv = [
+      ['Référence', 'Statut', 'Bien', 'Nom', 'Email', 'Téléphone', 'Date souhaitée', 'Créée le', 'Message'],
+      ...rows,
+    ]
+      .map((row) => row.map(escapeCsvValue).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = `reservations-ek-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const formatLogDate = (date: string) =>
@@ -775,80 +928,210 @@ export default function AdminPage() {
         {/* Bookings Section */}
         {activeTab === 'bookings' && (
           <div>
+            <div className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-primary">Réservations</h2>
+                  <p className="text-sm text-gray-600">
+                    {pendingBookingsCount} en attente - {filteredBookings.length} affichée(s)
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    onClick={refreshBookings}
+                    disabled={isRefreshingBookings}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                  >
+                    <RefreshCcw size={16} className={isRefreshingBookings ? 'animate-spin' : ''} />
+                    Actualiser
+                  </button>
+                  <button
+                    onClick={exportBookingsCsv}
+                    disabled={!filteredBookings.length}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90 disabled:opacity-60"
+                  >
+                    <Download size={16} />
+                    Export CSV
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+                <label className="lg:col-span-2">
+                  <span className="mb-1 block text-sm font-semibold text-gray-700">Recherche</span>
+                  <div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 focus-within:ring-2 focus-within:ring-secondary">
+                    <Search size={18} className="text-gray-400" />
+                    <input
+                      value={bookingSearch}
+                      onChange={(event) => setBookingSearch(event.target.value)}
+                      placeholder="Nom, email, téléphone, référence..."
+                      className="w-full border-0 bg-transparent text-sm outline-none"
+                    />
+                  </div>
+                </label>
+                <label>
+                  <span className="mb-1 block text-sm font-semibold text-gray-700">Statut</span>
+                  <select
+                    value={bookingStatusFilter}
+                    onChange={(event) =>
+                      setBookingStatusFilter(event.target.value as 'all' | Booking['status'])
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                  >
+                    <option value="all">Tous</option>
+                    <option value="pending">En attente</option>
+                    <option value="confirmed">Confirmée</option>
+                    <option value="cancelled">Annulée</option>
+                  </select>
+                </label>
+                <label>
+                  <span className="mb-1 block text-sm font-semibold text-gray-700">Bien</span>
+                  <select
+                    value={bookingPropertyFilter}
+                    onChange={(event) => setBookingPropertyFilter(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                  >
+                    <option value="all">Tous les biens</option>
+                    {properties.map((property) => (
+                      <option key={property.id} value={property.id}>
+                        {property.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+
             {bookings.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-lg">
                 <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
                 <p className="text-gray-600 text-lg">Aucune réservation pour le moment</p>
               </div>
+            ) : filteredBookings.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <Search size={48} className="mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-600 text-lg">Aucune réservation ne correspond aux filtres</p>
+              </div>
             ) : (
               <div className="space-y-4">
-                {bookings.map((booking) => (
-                  <motion.div
-                    key={booking.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="bg-white p-6 rounded-lg shadow-md border border-gray-200"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold text-primary">
-                          {properties.find((property) => property.id === booking.propertyId)?.name ||
-                            `Annonce #${booking.propertyId}`}
-                        </h3>
-                        <p className="font-semibold text-gray-800">{booking.name}</p>
-                        <p className="text-sm font-semibold text-secondary">
-                          Référence : {formatBookingReference(booking.id)}
-                        </p>
-                        <p className="text-gray-600">{booking.email}</p>
-                        <p className="text-gray-600">{booking.phone}</p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Date souhaitée : {formatFrenchDate(booking.checkInDate)}
-                        </p>
-                        <span
-                          className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold ${getBookingStatusClass(booking.status)}`}
-                        >
-                          {getBookingStatusLabel(booking.status)}
-                        </span>
-                        {booking.message && (
-                          <div className="mt-3 rounded-lg bg-gray-50 p-3">
-                            <p className="text-sm font-semibold text-gray-500">Message</p>
-                            <p className="text-gray-700">{booking.message}</p>
+                {filteredBookings.map((booking) => {
+                  const property = properties.find((item) => item.id === booking.propertyId);
+                  const isExpanded = expandedBooking === booking.id;
+
+                  return (
+                    <motion.div
+                      key={booking.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="bg-white p-6 rounded-lg shadow-md border border-gray-200"
+                    >
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <h3 className="text-xl font-bold text-primary">
+                              {property?.name || `Annonce #${booking.propertyId}`}
+                            </h3>
+                            {isNewBooking(booking) && (
+                              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
+                                Nouveau
+                              </span>
+                            )}
                           </div>
-                        )}
-                        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                          <label className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-gray-700">Statut :</span>
-                            <select
-                              value={booking.status}
-                              onChange={(event) =>
-                                updateBooking(booking.id, {
-                                  status: event.target.value as Booking['status'],
-                                })
-                              }
-                              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
-                            >
-                              <option value="pending">En attente</option>
-                              <option value="confirmed">Confirmée</option>
-                              <option value="cancelled">Annulée</option>
-                            </select>
-                          </label>
-                          <a
-                            href={getReplyMailLink(booking)}
-                            className="inline-flex items-center justify-center rounded-lg bg-secondary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90"
+                          <p className="font-semibold text-gray-800">{booking.name}</p>
+                          <p className="text-sm font-semibold text-secondary">
+                            Référence : {formatBookingReference(booking.id)}
+                          </p>
+                          <p className="text-gray-600">{booking.email}</p>
+                          <p className="text-gray-600">{booking.phone || 'Téléphone non renseigné'}</p>
+                          <p className="text-sm text-gray-500 mt-2">
+                            Date souhaitée : {formatFrenchDate(booking.checkInDate)}
+                          </p>
+                          <span
+                            className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-semibold ${getBookingStatusClass(booking.status)}`}
                           >
-                            Répondre par mail
-                          </a>
+                            {getBookingStatusLabel(booking.status)}
+                          </span>
+                          {booking.message && (
+                            <div className="mt-3 rounded-lg bg-gray-50 p-3">
+                              <p className="text-sm font-semibold text-gray-500">Message</p>
+                              <p className="text-gray-700">{booking.message}</p>
+                            </div>
+                          )}
+                          {isExpanded && (
+                            <div className="mt-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 md:grid-cols-2">
+                              <div>
+                                <p className="text-xs font-bold uppercase text-gray-500">Créée le</p>
+                                <p className="text-gray-800">
+                                  {new Intl.DateTimeFormat('fr-FR', {
+                                    dateStyle: 'short',
+                                    timeStyle: 'short',
+                                  }).format(new Date(booking.createdAt))}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold uppercase text-gray-500">ID interne</p>
+                                <p className="break-all font-mono text-sm text-gray-800">{booking.id}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold uppercase text-gray-500">Email client</p>
+                                <a href={`mailto:${booking.email}`} className="break-all text-secondary hover:underline">
+                                  {booking.email}
+                                </a>
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold uppercase text-gray-500">Bien</p>
+                                <p className="text-gray-800">{property?.name || `Annonce #${booking.propertyId}`}</p>
+                              </div>
+                            </div>
+                          )}
+                          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                            <label className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-gray-700">Statut :</span>
+                              <select
+                                value={booking.status}
+                                onChange={(event) =>
+                                  updateBooking(booking.id, {
+                                    status: event.target.value as Booking['status'],
+                                  })
+                                }
+                                className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-secondary"
+                              >
+                                <option value="pending">En attente</option>
+                                <option value="confirmed">Confirmée</option>
+                                <option value="cancelled">Annulée</option>
+                              </select>
+                            </label>
+                            <button
+                              onClick={() => setExpandedBooking(isExpanded ? null : booking.id)}
+                              className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50"
+                            >
+                              {isExpanded ? 'Masquer détails' : 'Voir détails'}
+                            </button>
+                            <a
+                              href={getReplyMailLink(booking)}
+                              className="inline-flex items-center justify-center rounded-lg bg-secondary px-4 py-2 text-sm font-bold text-white hover:bg-opacity-90"
+                            >
+                              Répondre par mail
+                            </a>
+                            <a
+                              href={getAdminNotificationMailLink(booking)}
+                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-secondary px-4 py-2 text-sm font-bold text-secondary hover:bg-secondary hover:bg-opacity-10"
+                            >
+                              <Bell size={16} />
+                              Mail admin
+                            </a>
+                          </div>
                         </div>
+                        <button
+                          onClick={() => deleteBooking(booking.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 size={20} />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => deleteBooking(booking.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded"
-                      >
-                        <Trash2 size={20} />
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -898,7 +1181,24 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-500">Mot de passe</p>
-                        <p className="break-all font-mono text-sm font-bold text-gray-800">{user.password}</p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <p className="break-all font-mono text-sm font-bold text-gray-800">
+                            {visiblePasswords[user.id] ? user.password : '••••••••••••'}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setVisiblePasswords((current) => ({
+                                ...current,
+                                [user.id]: !current[user.id],
+                              }))
+                            }
+                            className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-primary"
+                            aria-label={visiblePasswords[user.id] ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                          >
+                            {visiblePasswords[user.id] ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-500">Rôle</p>
